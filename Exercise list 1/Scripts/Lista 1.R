@@ -43,7 +43,7 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
   unzip(zipfile = str_c("Exercise list 1/Data/econ_data.zip"), 
                             exdir = "Exercise list 1/Data/data_unzip/econ_data.zip")
  
-  dat <- read_dta("Exercise list 1/Data/data_unzip/econ_data.zip/cps09mar/cps09mar.dta")
+  cps09mar <- read_dta("Exercise list 1/Data/data_unzip/econ_data.zip/cps09mar/cps09mar.dta")
 
   # 1) Run a linear regression of log earnings on age, age squared,
   # sex and education. 
@@ -113,7 +113,7 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
   #there, also calculate X′Y and calculate by hand both βˆand Var(βˆ).
   
   x <- data2 %>%
-    select(intercept, experience, experiencesqr, female, education) %>%
+    select(intercept, experience, experiencesqr, female, education) %>% 
     as.matrix()
   y <- data2 %>%
     select(lnearning) %>%
@@ -121,12 +121,14 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
   xy <- t(x)%*%y
   βhat <- solve(t(x)%*%x,t(x)%*%y)
 
+  teta <- βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])
   
   model4 <- #just checking rs
     cps09mar %>%
     mutate(experience = age - 15) %>% 
     lm(formula = log(earnings) ~ experience + I(experience^2) + 
          female + education)
+  stargazer(model4, type = "text")
   
   sandwich::vcovCL(model4,type = "HC0", cluster = ~region)
   coeftest(model4, vcov = vcovCL, cluster = ~region)
@@ -170,4 +172,17 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
 
   ##############
   
+  R <- c(0,
+         -βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
+         -6*βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
+         0,
+         1/(βhat[2,1] + 6*βhat[3,1])) %>%
+    as.matrix()
+  
+  Vteta <- t(R) %*% v1 %*% R
+  sqrt(Vteta)
+    
+
+    
+    
   

@@ -166,6 +166,8 @@ experience   1376718   64699562   3198974286   588534   19256150   44048792
 
 For what folllows, remove age variables and leave only experience and experience squared. (Also: now that you are already half-way there, also calculate X'Y and calculate by hand both 𝝱hat and Var(𝝱hat).
 
+ln(earnings) = Intercept + 𝞫~1~ experience + 𝞫~2~ experience^2^ + 𝞫~3~ female + 𝞫~4~ educ
+
 ```{r}
   x <- data2 %>%
     select(intercept, experience, experiencesqr, female, education) %>%
@@ -282,6 +284,8 @@ And then, the cluster-robust standard errors:
    3.133537e-03 
 ```
 
+As we can see, the cluster-robust standard errors are highly underestimated, it is clear that clustering by region is not a great choice as the number of regions is low. This leads, in a way, to a heteroskedatic regression with only 4 "observations", and the individuals are not so correlated between regions. Clustering by region, in this sense, is just "lowering our information" with no return in terms of bias.
+
 4.  Now use the Frisch-Waugh-Lovell theorem to estimate the effect of education on wages, while partialling out the controls in (1). Is the estimated coefficient the same? What about its standard deviation?
 
 ```{r}
@@ -379,4 +383,55 @@ F Statistic         14,453.430*** (df = 1; 50740)
 Note:                 *p<0.1; **p<0.05; ***p<0.01
 ```
 
-As the results of the regression shows, after partitioning the regression, regressing first, the model of the question 1 without the variable education, then, regressing the same formula in respect to education, and finally, regressing the residuals of those regressions, one by another, we can find the same coefficient of the model1, with the same standard deviation, as well.
+As the results of the regression shows, after partitioning the regression, regressing: first, the model of the question 1 without the variable education; then, regressing the same formula in respect to education; and finally, regressing the residuals of those regressions, one by another, we can find the same coefficient of the model1, with the same standard deviation, as well.
+
+5.  Consider a 18 years-old prospective college student deciding whether to study or work. He wants to know the *ratio* 𝜭 between returns of education and returns to experience, given his age. Write 𝜭 as a function of the parameters 𝞫 and estimate it.
+
+    ```{r}
+    teta <- βhat[5,1]/(βhat[2,1] + 6*βhat[3,1]) #betas from the regression ln(earnings) = Intercept + 𝞫1 experience + 𝞫2 experience2 + 𝞫3 female + 𝞫4 educ
+    ```
+
+We can write the formula of 𝜭 using the derivatives of the ln(earnings) in respect to the variables that we want the return, then we have:
+
+𝜭~1~ = 𝞫~4~ -\> returns of education in terms of ln(earnings);
+
+and 𝜭~2~ = 𝞫~1~ + 2 𝞫~2~experience -\> returns of experience in terms of ln(earnings)
+
+substituting experience by the level of a 18 years-old student (18-15 = 3), we have:
+
+𝜭~2~ = 𝞫~1~ + 6 𝞫~2~
+
+Then the *ratio* 𝜭 between returns of education and returns to experience will be:
+
+𝜭 = 𝞫~4~ /(𝞫~1~ + 6 𝞫~2~) Finally multiplying by the betas -\> 𝜭 = 2.50
+
+6.  Write out the formula for the asymptotic variance of 𝜭hat as a function of the variance-covariance matrix and find the standard deviation of the estimator.
+
+First we need to calculate the asymptotic variance wich will be: V~𝜭~ = R'V~𝜷~R wih V~𝜷~ being the variance-covariance matrix that we calculated before.
+
+```{r}
+  R <- c(0,
+         -βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
+         -6*βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
+         0,
+         1/(βhat[2,1] + 6*βhat[3,1])) %>%
+    as.matrix()
+  
+  Vteta <- t(R) %*% v1 %*% R
+  sqrt(Vteta)
+```
+
+First calculate R:
+
+```         
+           [,1]
+[1,]   0.000000
+[2,]  -6.292458
+[3,] -37.754748
+[4,]   0.000000
+[5,]  22.002328
+```
+
+Then the R'V~𝜷~R:
+
+V~𝜭~ = 0.00058 and the s(V~𝜭~) = 0.024
