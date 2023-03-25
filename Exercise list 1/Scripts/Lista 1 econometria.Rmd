@@ -1,0 +1,382 @@
+---
+title: "Lista 1 Econometria"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: '2023-03-24'
+output: html_document
+---
+
+1)  Run a linear regression of log earnings on age, age squared, sex and education.
+
+    ln(earnings) = Intercept + 𝞫~1~ age+ 𝞫~2~ age^2^ + 𝞫~3~ female + 𝞫~4~ educ
+
+```{r}
+  model1 <-
+    cps09mar %>%
+    lm(formula = log(earnings) ~ age + I(age^2) + female + education)
+    stargazer(model1)
+```
+
+ln(earnings) = 7.574 + 0.071age - 0.0007age^2^ - 0.319female + 0.114educ
+
+```         
+================================================
+                        Dependent variable:     
+                    ----------------------------
+                           log(earnings)        
+------------------------------------------------
+age                           0.071***          
+                              (0.001)           
+                                                
+I(age2)                      -0.001***          
+                             (0.00002)          
+                                                
+female                       -0.319***          
+                              (0.005)           
+                                                
+education                     0.114***          
+                              (0.001)           
+                                                
+Constant                      7.574***          
+                              (0.032)           
+                                                
+------------------------------------------------
+Observations                   50,742           
+R2                             0.308            
+Adjusted R2                    0.308            
+Residual Std. Error      0.583 (df = 50737)     
+F Statistic         5,647.710*** (df = 4; 50737)
+================================================
+Note:                *p<0.1; **p<0.05; ***p<0.01
+```
+
+What is the expected log earnings of a 20 years old woman as a function of her education?
+
+ln(earnings) = Intercept + 𝞫~1~ age+ 𝞫~2~ age^2^ + 𝞫~3~ female + 𝞫~4~ educ
+
+For a 20 years woman, the expected log earnings function will be:
+
+ln(earnings) = Intercept + 𝞫~1~ 20+ 𝞫~2~ 20^2^ + 𝞫~3~ 1 + 𝞫~4~ educ
+
+```{r}
+betas <- coef(model1) 
+      betas["(Intercept)"] + betas["age"]*20 + 
+        betas["I(age^2)"]*400 + betas["female"]*1
+```
+
+This gives us:
+
+ln(earnings) = 8.39 + 0.114 educ
+
+What is the average partial effect of another year of age on log earnings?
+
+To find the age partial effect we derive the equation of the linear regression in respect to age, wich gives us:
+
+Age Partial Effect = 𝞫~1~ + 2𝞫~2~ age
+
+The average partial effect can be calculated by using the average age into the formula above.
+
+```{r}
+  vg_age <-  
+    cps09mar %>%
+      summarise(
+        avg_age = mean(age)
+        )
+  
+  avg_PE_age <-
+    betas["age"] + 2 * betas["I(age^2)"] * avg_age 
+  avg_PE_age
+```
+
+Average Age Partial Effect = 0.011
+
+2)  In the job market, an important predictor of wages is experience. Unfortunately, that is a variable almost universally missing from data sets, which at most have tenure at current work. So many applied economists proxy for experience as age - 15 (minimum working age at the data). Add this variable to the regression. What happens? Calculate (X'X) and explain.
+
+```{r}
+  model3 <-
+     cps09mar %>%
+     mutate(experience = age - 15) %>% 
+     lm(formula = log(earnings) ~ age + I(age^2) + female + 
+          education + experience)
+    
+      stargazer(model3, type = "text")
+```
+
+```         
+================================================
+                        Dependent variable:     
+                    ----------------------------
+                           log(earnings)        
+------------------------------------------------
+age                           0.071***          
+                              (0.001)           
+                                                
+I(age2)                      -0.001***          
+                             (0.00002)          
+                                                
+female                       -0.319***          
+                              (0.005)           
+                                                
+education                     0.114***          
+                              (0.001)           
+                                                
+experience                                      
+                                                
+                                                
+Constant                      7.574***          
+                              (0.032)           
+                                                
+------------------------------------------------
+Observations                   50,742           
+R2                             0.308            
+Adjusted R2                    0.308            
+Residual Std. Error      0.583 (df = 50737)     
+F Statistic         5,647.710*** (df = 4; 50737)
+================================================
+Note:                *p<0.1; **p<0.05; ***p<0.01
+```
+
+When regressing with the new proxy variable experience, the function excludes the variable and run normally without it, giving us the same regression and coefficients of the first question. This happens because the proxy variable is highly correlated with the age variable, when including it in the dependent variables matrix, the X'X matrix becomes singular (non invertible). Therefore, the regression won't run.
+
+```{r}
+  data2 <-
+     cps09mar %>%
+     select(earnings, age, female, education) %>%
+     mutate(lnearning = log(earnings), 
+            agesqr = age^2, 
+            experience = age - 15,
+            experiencesqr = experience^2,
+            intercept = 1)
+  
+    x <- data2 %>%
+    select(intercept, age, agesqr, female, education, experience) %>%
+    as.matrix()
+    xx <- t(x)%*%x
+    solve(xx)
+```
+
+```         
+           intercept        age       agesqr   female  education experience
+intercept      50742    2137848     96767282    21602     706563    1376718
+age          2137848   96767282   4650483516   912564   29854595   64699562
+agesqr      96767282 4650483516 234833769554 41384072 1353323427 3198974286
+female         21602     912564     41384072    21602     303863     588534
+education     706563   29854595   1353323427   303863   10220801   19256150
+experience   1376718   64699562   3198974286   588534   19256150   44048792
+```
+
+For what folllows, remove age variables and leave only experience and experience squared. (Also: now that you are already half-way there, also calculate X'Y and calculate by hand both 𝝱hat and Var(𝝱hat).
+
+```{r}
+  x <- data2 %>%
+    select(intercept, experience, experiencesqr, female, education) %>%
+    as.matrix()
+  y <- data2 %>%
+    select(lnearning) %>%
+    as.matrix()
+  xy <- t(x)%*%y
+  βhat <- solve(t(x)%*%x,t(x)%*%y)
+```
+
+X'Y
+
+```         
+              lnearning
+intercept        541056
+experience     14756054
+experiencesqr 472932536
+female           226774
+education       7578512
+```
+
+𝝱hat = (X'X)^-1^ X'Y
+
+```         
+                  lnearning
+intercept      8.4808611017
+experience     0.0497284322
+experiencesqr -0.0007131159
+female        -0.3187190634
+education      0.1140096302
+```
+
+3.  Compute homoskedastic and heteroskedastic-robust standard errors of the estimators. Do they differ? Which one do you prefer? Now estimate cluster-robust standard errors at the level of the region. Discuss whether this is a reasonable approach in this case.
+
+    ```{r}
+      n <- nrow(y)
+      k <- ncol(x)
+      e <- y - x%*%βhat
+      S2 <- (t(e) %*% e)/(n-k)
+      xx <- solve(t(x)%*%x) 
+      v0 <- 0.3403983*xx  
+      s0 <- sqrt(diag(v0)) #Assuming homoskedasticity (never use)
+      u1 <- x*(e%*%matrix(1,1,k))
+      v1 <- xx %*% (t(u1)%*%u1) %*% xx #Using White's formula and allowing for heteroskedasticity
+      s1 <- sqrt(diag(v1))
+    ```
+
+Assuming homoskedasticity we have: S^2^ = 0.34 as an unbiased estimator for the variance of the residuals. In this case, the estimator for the variance will be simply: (X'X)^-1^ S^2^ And the standard errors of the estimators:
+
+```         
+    intercept    experience experiencesqr        female     education 
+ 1.767638e-02  9.773966e-04  1.707314e-05  5.243546e-03  9.483506e-04 
+```
+
+Allowing for heteroskedasticity, we can use an estimator of the covariance matrix for compute the robust standard errors of the estimators:
+
+The covariance matrix:
+
+```         
+                  intercept    experience experiencesqr        female
+intercept      3.868944e-04 -1.389547e-05  2.318153e-07 -6.219498e-06
+experience    -1.389547e-05  1.222743e-06 -2.179383e-08  6.039790e-08
+experiencesqr  2.318153e-07 -2.179383e-08  4.063530e-10 -2.782565e-09
+female        -6.219498e-06  6.039790e-08 -2.782565e-09  2.642656e-05
+education     -1.465974e-05 -3.654673e-08  8.198573e-10 -4.512832e-07
+                  education
+intercept     -1.465974e-05
+experience    -3.654673e-08
+experiencesqr  8.198573e-10
+female        -4.512832e-07
+education      1.104842e-06
+```
+
+And the Standard Errors of the coefficients:
+
+```         
+    intercept    experience experiencesqr        female     education 
+ 0.0196696319  0.0011057770  0.0000201582  0.0051406772  0.0010511146 
+```
+
+Since it is unlikely to have homoskedastic errors in the real empirical research data, the first estimator is not a good choice. So, allowing for heteroskedasticity is better, and the second estimator preferable.
+
+Now, to find the cluster-robust standard errors at the level of the region, we first estimate the cluster robust covariance matrix, and then compute the cluster-robust standard errors.
+
+```{r}
+  clustervcov <- sandwich::vcovCL(model4,type = "HC0", cluster = ~region)
+  s2 <- sqrt(diag(clustervcov))
+```
+
+First the 𝛀 matrix of variance covariance:
+
+```         
+                  (Intercept)    experience I(experience^2)
+(Intercept)      2.000612e-03  1.280501e-05   -1.847675e-07
+experience       1.280501e-05  3.680014e-06   -6.168730e-08
+I(experience^2) -1.847675e-07 -6.168730e-08    1.052714e-09
+female           3.617478e-04  5.720019e-06   -9.442760e-08
+education       -1.320991e-04 -1.703482e-06    3.065774e-08
+                       female     education
+(Intercept)      3.617478e-04 -1.320991e-04
+experience       5.720019e-06 -1.703482e-06
+I(experience^2) -9.442760e-08  3.065774e-08
+female           6.941137e-05 -2.553145e-05
+education       -2.553145e-05  9.819052e-06
+```
+
+And then, the cluster-robust standard errors:
+
+```         
+    (Intercept)      experience I(experience^2)          female 
+   4.472820e-02    1.918336e-03    3.244555e-05    8.331349e-03 
+      education 
+   3.133537e-03 
+```
+
+4.  Now use the Frisch-Waugh-Lovell theorem to estimate the effect of education on wages, while partialling out the controls in (1). Is the estimated coefficient the same? What about its standard deviation?
+
+```{r}
+  model5 <-
+    cps09mar %>%
+    lm(formula = log(earnings) ~ age + I(age^2) + female)
+  stargazer(model5, type = "text")
+  ê1 <- residuals(model5)
+  
+  model6 <-
+    cps09mar %>%
+    lm(formula = education ~ age + I(age^2) + female)
+  stargazer(model6, type = "text")
+  X2 <- residuals(model6)
+  
+  model7 <- lm(formula = ê1 ~ X2)
+  stargazer(model7, type = "text")
+```
+
+```         
+================================================
+                        Dependent variable:     
+                    ----------------------------
+                           log(earnings)        
+------------------------------------------------
+age                           0.085***          
+                              (0.002)           
+                                                
+I(age2)                      -0.001***          
+                             (0.00002)          
+                                                
+female                       -0.291***          
+                              (0.006)           
+                                                
+Constant                      8.845***          
+                              (0.035)           
+                                                
+------------------------------------------------
+Observations                   50,742           
+R2                             0.111            
+Adjusted R2                    0.111            
+Residual Std. Error      0.661 (df = 50738)     
+F Statistic         2,111.377*** (df = 3; 50738)
+================================================
+Note:                *p<0.1; **p<0.05; ***p<0.01
+```
+
+```         
+===============================================
+                        Dependent variable:    
+                    ---------------------------
+                             education         
+-----------------------------------------------
+age                          0.120***          
+                              (0.007)          
+                                               
+I(age2)                      -0.001***         
+                             (0.0001)          
+                                               
+female                       0.242***          
+                              (0.025)          
+                                               
+Constant                     11.147***         
+                              (0.144)          
+                                               
+-----------------------------------------------
+Observations                  50,742           
+R2                             0.010           
+Adjusted R2                    0.010           
+Residual Std. Error     2.731 (df = 50738)     
+F Statistic         165.106*** (df = 3; 50738) 
+===============================================
+Note:               *p<0.1; **p<0.05; ***p<0.01
+```
+
+```         
+=================================================
+                         Dependent variable:     
+                    -----------------------------
+                                 ê1              
+-------------------------------------------------
+X2                            0.114***           
+                               (0.001)           
+                                                 
+Constant                       -0.000            
+                               (0.003)           
+                                                 
+-------------------------------------------------
+Observations                   50,742            
+R2                              0.222            
+Adjusted R2                     0.222            
+Residual Std. Error      0.583 (df = 50740)      
+F Statistic         14,453.430*** (df = 1; 50740)
+=================================================
+Note:                 *p<0.1; **p<0.05; ***p<0.01
+```
+
+As the results of the regression shows, after partitioning the regression, regressing first, the model of the question 1 without the variable education, then, regressing the same formula in respect to education, and finally, regressing the residuals of those regressions, one by another, we can find the same coefficient of the model1, with the same standard deviation, as well.
