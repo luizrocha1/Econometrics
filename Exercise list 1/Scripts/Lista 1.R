@@ -33,7 +33,7 @@
  # Install and load packages ----
  
  if (!require(install.load)) install.packages(install.load)
-install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest") 
+install.load::install_load("tidyverse", "haven", "stargazer","aod") 
  
  
  # Downloading data
@@ -121,7 +121,7 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
   xy <- t(x)%*%y
   βhat <- solve(t(x)%*%x,t(x)%*%y)
 
-  teta <- βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])
+  
   
   model4 <- #just checking rs
     cps09mar %>%
@@ -130,7 +130,7 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
          female + education)
   stargazer(model4, type = "text")
   
-  sandwich::vcovCL(model4,type = "HC0", cluster = ~region)
+  vcov <- sandwich::vcovCL(model4,type = "HC0")
   coeftest(model4, vcov = vcovCL, cluster = ~region)
   
   # 3) Compute homoskedastic and heteroskedastic-robust standard errors of
@@ -143,15 +143,20 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
   e <- y - x%*%βhat
   S2 <- (t(e) %*% e)/(n-k)
   xx <- solve(t(x)%*%x) 
+  invx <- solve(xx)
   v0 <- 0.3403983*xx  
   s0 <- sqrt(diag(v0)) #Assuming homoskedasticity (never use)
   u1 <- x*(e%*%matrix(1,1,k))
   v1 <- xx %*% (t(u1)%*%u1) %*% xx #Using White's formula and allowing for heteroskedasticity
   s1 <- sqrt(diag(v1))
-    
-  clustervcov <- sandwich::vcovCL(model4,type = "HC0", cluster = ~region)
-  s2 <- sqrt(diag(clustervcov))
-  
+  xe <- x*rep(y-x%*%βhat,times=k)
+  region <- data2 %>% select(region) %>% as.matrix()
+  xe_sum <- rowsum(xe,region)
+  omega <- t(xe_sum)%*%xe_sum
+  V_clustered <- solve(xx)%*%omega%*%solve(xx) # Clustered var covar
+  se_clustered <- sqrt(diag(V_clustered)) # Clustered robust standard error
+
+
   
   ###############
   
@@ -172,6 +177,8 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
 
   ##############
   
+  teta <- βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])
+  
   R <- c(0,
          -βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
          -6*βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
@@ -181,8 +188,26 @@ install.load::install_load("tidyverse", "haven", "stargazer", "sandwich","lmtest
   
   Vteta <- t(R) %*% v1 %*% R
   sqrt(Vteta)
-    
+  
+  #####################
 
-    
-    
+  IC <- c(teta - 1.645*sqrt(Vteta) ,teta + 1.645*sqrt(Vteta))
+
+  R1<- matrix(c(0,0,0,-1,0,-6,0,0,1,0),nrow = 2,ncol = 5)
+  R2 <- matrix(c(0,0,0,0,-1,0,0,0,-6,0,0,0,1,0,0),nrow = 3,ncol = 5)
+  bbb <- c(βhat[5,1], βhat[2,1], βhat[3,1]) %>% as.matrix()
+  v1
+  c1 <- c(0,0) %>% as.matrix()
+  
+  estw <- t(R1%*%βhat  - c1) %*% 
+    solve(R1%*%v1%*%t(R1)) %*%
+    (R1%*%βhat  - c1)
+
+
+  
+  Vteta2 <- R2 %*% vcov %*% t(R2)
+  W <- t(coefmatrix) %*%  solve(Vteta2) %*% coefmatrix
+
+  wald.test(b = βhat, Sigma = v1, L = R1)
+  
   
