@@ -5,6 +5,18 @@ date: '2023-03-24'
 output: html_document
 ---
 
+```{r include=FALSE}
+ 
+ if (!require(install.load)) install.packages(install.load)
+install.load::install_load("tidyverse", "haven", "stargazer","sandwich", "aod") 
+ 
+```
+
+```{r}
+  cps09mar <- read_dta("cps09mar.dta")
+
+```
+
 1)  Run a linear regression of log earnings on age, age squared, sex and education.
 
     ln(earnings) = Intercept + 𝞫~1~ age+ 𝞫~2~ age^2^ + 𝞫~3~ female + 𝞫~4~ educ
@@ -13,7 +25,6 @@ output: html_document
   model1 <-
     cps09mar %>%
     lm(formula = log(earnings) ~ age + I(age^2) + female + education)
-    stargazer(model1)
 ```
 
 ln(earnings) = 7.574 + 0.071age - 0.0007age^2^ - 0.319female + 0.114educ
@@ -76,7 +87,7 @@ Age Partial Effect = 𝞫~1~ + 2𝞫~2~ age
 The average partial effect can be calculated by using the average age into the formula above.
 
 ```{r}
-  vg_age <-  
+  avg_age <-  
     cps09mar %>%
       summarise(
         avg_age = mean(age)
@@ -97,8 +108,6 @@ Average Age Partial Effect = 0.011
      mutate(experience = age - 15) %>% 
      lm(formula = log(earnings) ~ age + I(age^2) + female + 
           education + experience)
-    
-      stargazer(model3, type = "text")
 ```
 
 ```         
@@ -151,7 +160,6 @@ When regressing with the new proxy variable experience, the function excludes th
     select(intercept, age, agesqr, female, education, experience) %>%
     as.matrix()
     xx <- t(x)%*%x
-    solve(xx)
 ```
 
 ```         
@@ -255,35 +263,39 @@ Now, to find the cluster-robust standard errors at the level of the region, we f
 
 ```{r}
   xe <- x*rep(y-x%*%βhat,times=k)
-  region <- data2 %>% select(region) %>% as.matrix()
+  region <- cps09mar %>% select(region) %>% as.matrix()
   xe_sum <- rowsum(xe,region)
   omega <- t(xe_sum)%*%xe_sum
-  V_clustered <- solve(xx)%*%omega%*%solve(xx)
+  G <- nrow(xe_sum)
+  scale <- G/(G-1)*(n-1)/(n-k)
+  V_clustered <- scale*solve(xx)%*%omega%*%solve(xx)
   se_clustered <- sqrt(diag(V_clustered))
 ```
 
 First the 𝛀 matrix of variance covariance:
 
 ```         
-                 intercept   experience experiencesqr       female
-intercept     2.311598e+27 8.225988e+28  3.155699e+30 9.901356e+26
-experience    8.225988e+28 2.927277e+30  1.122978e+32 3.523469e+28
-experiencesqr 3.155699e+30 1.122978e+32  4.308032e+33 1.351693e+30
-female        9.901356e+26 3.523469e+28  1.351693e+30 4.241086e+26
-education     3.236150e+28 1.151608e+30  4.417861e+31 1.386153e+28
-                 education
-intercept     3.236150e+28
-experience    1.151608e+30
-experiencesqr 4.417861e+31
-female        1.386153e+28
-education     4.530490e+29
+                 intercept   experience experiencesqr
+intercept     3.082373e+27 1.096885e+29  4.207931e+30
+experience    1.096885e+29 3.903344e+30  1.497423e+32
+experiencesqr 4.207931e+30 1.497423e+32  5.744496e+33
+female        1.320285e+27 4.698329e+28  1.802399e+30
+education     4.315207e+28 1.535598e+30  5.890945e+31
+                    female    education
+intercept     1.320285e+27 4.315207e+28
+experience    4.698329e+28 1.535598e+30
+experiencesqr 1.802399e+30 5.890945e+31
+female        5.655228e+26 1.848350e+28
+education     1.848350e+28 6.041129e+29
 ```
 
 And then, the cluster-robust standard errors:
 
 ```         
-    intercept    experience experiencesqr        female     education 
- 4.807908e+13  1.710929e+15  6.563560e+16  2.059390e+13  6.730891e+14 
+    intercept    experience experiencesqr        female 
+ 5.551912e+13  1.975688e+15  7.579245e+16  2.378072e+13 
+    education 
+ 7.772470e+14
 ```
 
 As we can see, the cluster-robust standard errors are highly overestimated, it is clear that clustering by region is not a great choice as the number of regions is low. This leads, in a way, to a heteroskedatic regression with only 4 "observations", and the individuals are not so correlated between regions. Clustering by region, in this sense, is just "lowering our information" with no return in terms of bias leading to absurdly high heteroskedastic errors.
@@ -294,17 +306,14 @@ As we can see, the cluster-robust standard errors are highly overestimated, it i
   model5 <-
     cps09mar %>%
     lm(formula = log(earnings) ~ age + I(age^2) + female)
-  stargazer(model5, type = "text")
   ê1 <- residuals(model5)
   
   model6 <-
     cps09mar %>%
     lm(formula = education ~ age + I(age^2) + female)
-  stargazer(model6, type = "text")
   X2 <- residuals(model6)
   
   model7 <- lm(formula = ê1 ~ X2)
-  stargazer(model7, type = "text")
 ```
 
 ```         
@@ -390,7 +399,8 @@ As the results of the regression shows, after partitioning the regression, regre
 5.  Consider a 18 years-old prospective college student deciding whether to study or work. He wants to know the *ratio* 𝜭 between returns of education and returns to experience, given his age. Write 𝜭 as a function of the parameters 𝞫 and estimate it.
 
     ```{r}
-    teta <- βhat[5,1]/(βhat[2,1] + 6*βhat[3,1]) #betas from the regression ln(earnings) = Intercept + 𝞫1 experience + 𝞫2 experience2 + 𝞫3 female + 𝞫4 educ
+    teta <- βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])
+    teta #betas from the regression ln(earnings) = Intercept + 𝞫1 experience + 𝞫2 experience2 + 𝞫3 female + 𝞫4 educ
     ```
 
 We can write the formula of 𝜭 using the derivatives of the ln(earnings) in respect to the variables that we want the return, then we have:
@@ -413,38 +423,30 @@ First we need to calculate the asymptotic variance wich will be: V~𝜭~ = R'V~�
 
 ```{r}
   R <- c(0,
-         -βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
-         -6*βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
+         -βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])^2, 
+         -6*βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])^2, 
          0,
          1/(βhat[2,1] + 6*βhat[3,1])) %>%
     as.matrix()
+  R
   
   Vteta <- t(R) %*% v1 %*% R
+  Vteta
   sqrt(Vteta)
-```
-
-First calculate R:
-
-```         
-           [,1]
-[1,]   0.000000
-[2,]  -6.292458
-[3,] -37.754748
-[4,]   0.000000
-[5,]  22.002328
 ```
 
 Then the R'V~𝜷~R:
 
-V~𝜭~ = 0.00058 and the s(V~𝜭~) = 0.024
+V~𝜭~ = 0.00358 and the s(V~𝜭~) = 0.0598
 
 7.  Construct a 90% confidence interval for 𝜭hat.
 
     ```{r}
       IC <- c(teta - 1.645*sqrt(Vteta) ,teta + 1.645*sqrt(Vteta))
+      IC
     ```
 
-IC~𝜭~ = [2.468784, 2.548171]
+IC~𝜭~ = [2.4099, 2.6069]
 
 8.  Test whether 𝞫educ equals 𝞫exp + 𝞫exp^2^using a Wald statistic. Interpret.
 
@@ -454,15 +456,10 @@ IC~𝜭~ = [2.468784, 2.548171]
       estw <- t(R1%*%βhat  - c1) %*% 
         solve(R1%*%v1%*%t(R1)) %*%
         (R1%*%βhat  - c1)
+      estw
       wald.test(b = βhat, Sigma = v1, L = R1)
     ```
 
 W~n~ = 14198.75 (Wald statistics)
 
-```         
-P(> X2) = 0.0
-```
-
 By the p-value we can see that the null hypothesis of equality of the returns of education and experience of an 18 years-old college student is rejected.
-
-

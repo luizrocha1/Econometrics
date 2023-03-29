@@ -33,7 +33,7 @@
  # Install and load packages ----
  
  if (!require(install.load)) install.packages(install.load)
-install.load::install_load("tidyverse", "haven", "stargazer","aod") 
+install.load::install_load("tidyverse", "haven", "stargazer","sandwich") 
  
  
  # Downloading data
@@ -153,11 +153,12 @@ install.load::install_load("tidyverse", "haven", "stargazer","aod")
   region <- data2 %>% select(region) %>% as.matrix()
   xe_sum <- rowsum(xe,region)
   omega <- t(xe_sum)%*%xe_sum
-  V_clustered <- solve(xx)%*%omega%*%solve(xx) # Clustered var covar
+  G <- nrow(xe_sum)
+  scale <- G/(G-1)*(n-1)/(n-k)
+  V_clustered <- scale*solve(xx)%*%omega%*%solve(xx) # Clustered var covar
   se_clustered <- sqrt(diag(V_clustered)) # Clustered robust standard error
 
 
-  
   ###############
   
   model5 <-
@@ -180,8 +181,8 @@ install.load::install_load("tidyverse", "haven", "stargazer","aod")
   teta <- βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])
   
   R <- c(0,
-         -βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
-         -6*βhat[5,1]^2/(βhat[2,1] + 6*βhat[3,1])^2, 
+         -βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])^2, 
+         -6*βhat[5,1]/(βhat[2,1] + 6*βhat[3,1])^2, 
          0,
          1/(βhat[2,1] + 6*βhat[3,1])) %>%
     as.matrix()
