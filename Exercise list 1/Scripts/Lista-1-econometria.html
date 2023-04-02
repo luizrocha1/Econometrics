@@ -575,32 +575,30 @@ preferable.</p>
 <p>Now, to find the cluster-robust standard errors at the level of the
 region, we first estimate the cluster robust covariance matrix, and then
 compute the cluster-robust standard errors.</p>
-<pre class="r"><code>  xe &lt;- x*rep(y-x%*%βhat,times=k)
-  region &lt;- cps09mar %&gt;% select(region) %&gt;% as.matrix()
-  xe_sum &lt;- rowsum(xe,region)
-  omega &lt;- t(xe_sum)%*%xe_sum
-  G &lt;- nrow(xe_sum)
-  scale &lt;- G/(G-1)*(n-1)/(n-k)
-  V_clustered &lt;- scale*solve(xx)%*%omega%*%solve(xx)
-  se_clustered &lt;- sqrt(diag(V_clustered))</code></pre>
-<p>First the 𝛀 matrix of variance covariance:</p>
-<pre><code>                 intercept   experience experiencesqr
-intercept     3.082373e+27 1.096885e+29  4.207931e+30
-experience    1.096885e+29 3.903344e+30  1.497423e+32
-experiencesqr 4.207931e+30 1.497423e+32  5.744496e+33
-female        1.320285e+27 4.698329e+28  1.802399e+30
-education     4.315207e+28 1.535598e+30  5.890945e+31
-                    female    education
-intercept     1.320285e+27 4.315207e+28
-experience    4.698329e+28 1.535598e+30
-experiencesqr 1.802399e+30 5.890945e+31
-female        5.655228e+26 1.848350e+28
-education     1.848350e+28 6.041129e+29</code></pre>
-<p>And then, the cluster-robust standard errors:</p>
-<pre><code>    intercept    experience experiencesqr        female 
- 5.551912e+13  1.975688e+15  7.579245e+16  2.378072e+13 
-    education 
- 7.772470e+14</code></pre>
+<pre class="r"><code>  model4 &lt;- 
+    cps09mar %&gt;%
+    mutate(experience = age - 15) %&gt;% 
+    lm(formula = log(earnings) ~ experience + I(experience^2) + 
+         female + education)
+  
+  vcov_cl &lt;- sandwich::vcovCL(model4,type = &quot;HC0&quot;, cluster = ~region)
+  se_clustered &lt;- sqrt(diag(vcov_cl))
+  vcov_cl</code></pre>
+<pre><code>##                   (Intercept)    experience I(experience^2)        female
+## (Intercept)      2.000612e-03  1.280501e-05   -1.847675e-07  3.617478e-04
+## experience       1.280501e-05  3.680014e-06   -6.168730e-08  5.720019e-06
+## I(experience^2) -1.847675e-07 -6.168730e-08    1.052714e-09 -9.442760e-08
+## female           3.617478e-04  5.720019e-06   -9.442760e-08  6.941137e-05
+## education       -1.320991e-04 -1.703482e-06    3.065774e-08 -2.553145e-05
+##                     education
+## (Intercept)     -1.320991e-04
+## experience      -1.703482e-06
+## I(experience^2)  3.065774e-08
+## female          -2.553145e-05
+## education        9.819052e-06</code></pre>
+<pre class="r"><code>  se_clustered</code></pre>
+<pre><code>##     (Intercept)      experience I(experience^2)          female       education 
+##    4.472820e-02    1.918336e-03    3.244555e-05    8.331349e-03    3.133537e-03</code></pre>
 <p>As we can see, the cluster-robust standard errors are highly
 overestimated, it is clear that clustering by region is not a great
 choice as the number of regions is low. This leads, in a way, to a

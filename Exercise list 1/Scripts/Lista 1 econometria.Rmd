@@ -262,40 +262,17 @@ Since it is unlikely to have homoskedastic errors in the real empirical research
 Now, to find the cluster-robust standard errors at the level of the region, we first estimate the cluster robust covariance matrix, and then compute the cluster-robust standard errors.
 
 ```{r}
-  xe <- x*rep(y-x%*%βhat,times=k)
-  region <- cps09mar %>% select(region) %>% as.matrix()
-  xe_sum <- rowsum(xe,region)
-  omega <- t(xe_sum)%*%xe_sum
-  G <- nrow(xe_sum)
-  scale <- G/(G-1)*(n-1)/(n-k)
-  V_clustered <- scale*solve(xx)%*%omega%*%solve(xx)
-  se_clustered <- sqrt(diag(V_clustered))
-```
-
-First the 𝛀 matrix of variance covariance:
-
-```         
-                 intercept   experience experiencesqr
-intercept     3.082373e+27 1.096885e+29  4.207931e+30
-experience    1.096885e+29 3.903344e+30  1.497423e+32
-experiencesqr 4.207931e+30 1.497423e+32  5.744496e+33
-female        1.320285e+27 4.698329e+28  1.802399e+30
-education     4.315207e+28 1.535598e+30  5.890945e+31
-                    female    education
-intercept     1.320285e+27 4.315207e+28
-experience    4.698329e+28 1.535598e+30
-experiencesqr 1.802399e+30 5.890945e+31
-female        5.655228e+26 1.848350e+28
-education     1.848350e+28 6.041129e+29
-```
-
-And then, the cluster-robust standard errors:
-
-```         
-    intercept    experience experiencesqr        female 
- 5.551912e+13  1.975688e+15  7.579245e+16  2.378072e+13 
-    education 
- 7.772470e+14
+  model4 <- 
+    cps09mar %>%
+    mutate(experience = age - 15) %>% 
+    lm(formula = log(earnings) ~ experience + I(experience^2) + 
+         female + education)
+  
+  vcov_cl <- sandwich::vcovCL(model4,type = "HC0", cluster = ~region)
+  se_clustered <- sqrt(diag(vcov_cl))
+  vcov_cl
+  
+  se_clustered
 ```
 
 As we can see, the cluster-robust standard errors are highly overestimated, it is clear that clustering by region is not a great choice as the number of regions is low. This leads, in a way, to a heteroskedatic regression with only 4 "observations", and the individuals are not so correlated between regions. Clustering by region, in this sense, is just "lowering our information" with no return in terms of bias leading to absurdly high heteroskedastic errors.
