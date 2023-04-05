@@ -185,7 +185,15 @@ ln(earnings) = Intercept + 𝞫~1~ experience + 𝞫~2~ experience^2^ + 𝞫~3~ 
     as.matrix()
   xy <- t(x)%*%y
   βhat <- solve(t(x)%*%x,t(x)%*%y)
+    n <- nrow(y)
+  k <- ncol(x)
+  e <- y - x%*%βhat
+  S2 <- (t(e) %*% e)/(n-k)
+  xx <- solve(t(x)%*%x) 
+  S2
 ```
+
+Assuming homoskedasticity we have: S^2^ = 0.34 as an unbiased estimator for the variance of the residuals. In this case, the estimator for the variance will be simply: (X'X)^-1^ S^2^
 
 X'Y
 
@@ -212,11 +220,6 @@ education      0.1140096302
 3.  Compute homoskedastic and heteroskedastic-robust standard errors of the estimators. Do they differ? Which one do you prefer? Now estimate cluster-robust standard errors at the level of the region. Discuss whether this is a reasonable approach in this case.
 
     ```{r}
-      n <- nrow(y)
-      k <- ncol(x)
-      e <- y - x%*%βhat
-      S2 <- (t(e) %*% e)/(n-k)
-      xx <- solve(t(x)%*%x) 
       v0 <- 0.3403983*xx  
       s0 <- sqrt(diag(v0)) #Assuming homoskedasticity (never use)
       u1 <- x*(e%*%matrix(1,1,k))
@@ -224,7 +227,7 @@ education      0.1140096302
       s1 <- sqrt(diag(v1))
     ```
 
-Assuming homoskedasticity we have: S^2^ = 0.34 as an unbiased estimator for the variance of the residuals. In this case, the estimator for the variance will be simply: (X'X)^-1^ S^2^ And the standard errors of the estimators:
+The standard errors of the estimators:
 
 ```         
     intercept    experience experiencesqr        female     education 
