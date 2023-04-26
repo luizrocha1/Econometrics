@@ -1,0 +1,127 @@
+---
+title: "Lista 2 Econometria"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: "2023-04-18"
+output: html_document
+---
+
+```{r}
+ if (!require(install.load)) install.packages(install.load)
+install.load::install_load("tidyverse", "haven", "stargazer","sandwich", "aod", "ivreg") 
+ 
+```
+
+```{r}
+ ak1991 <- read_dta("Exercise list 1/Data/data_unzip/econ_data.zip/ak1991/ak1991.dta")
+```
+
+1.  Restrict the sample only to black. Run an OLS regression of log wages on education, urban and married, as well as dummies for year-of-birth, state-of-birth and region-of-residence (these dummies do not need to be reported).
+
+```{r}
+  dados1 <- ak1991 %>%
+   filter(black == 1)
+   
+   model1 <- lm(logwage ~ edu + married + smsa + factor(yob) + factor(state)
+      + factor(region), data = dados1) 
+    stargazer(model1, type = "text", keep = c("edu", "married", 
+                                             "smsa", "Constant"))
+```
+
+2)  Nesse caso não podemos falar que a estimação é confiável já que, pode-se esperar que a variável educação é endógena ao modelo, ou seja, E[Xe] ≠ 0. Dessa forma, é possivel que existam variáveis omitidas que apresentam setas de causalidade tanto para a variável educação como para a variável de efeito log dos salários. Nesse caso, o estimador de OLS para a variável educação pode ser consideravelmente sobrestimado.
+
+3)  Now apply the 2SLS estimator, using as instruments quarter-of-birth times year-of-birth (30 instruments). Report the first stage, reduced form and 2SLS estimates.
+
+```{r}
+   dados2 <- dados1 %>%
+     filter(qob != 4)
+   
+   model_1stage <- lm(edu ~ I(as.factor(qob):as.factor(yob)), data = dados2)
+   stargazer(model_1stage, type = "text")
+
+   model_2stage <- lm(logwage ~ model_1stage$fitted.values + smsa
+                      + married, data = dados2)
+   stargazer(model_2stage, type = "text")
+```
+
+4.  Dado que acreditamos na regressão IV, a partir dos coeficientes encontrados nessa segunda regressão, podemos perceber que existe uma sobrestimação, como esperado, do coeficiente associado à educação com relação ao log dos salários. Quando utilizamos os instrumentos propostos para educação, o efeito dessa variável no log dos salários diminui consideravelmente. Nesse caso, estamos utilizando uma variável exógena ao efeito (não aponta seta de causalidade para o log salários) mas que traça uma seta de causalidade para educação, de forma que podemos estimar como educação impacta no salário a partir do instrumento.
+
+<!-- -->
+
+5.  
+
+```{r}
+  #Durbin Wu Watson endogeneity test
+
+   resid_original <- lm(logwage ~ edu + married + smsa, data = dados2) %>%
+     residuals() %>%
+     as.vector()
+   
+   resid_InZ <- lm(edu ~ I(as.factor(qob):as.factor(yob)) + 
+                     smsa + married, data = dados2) %>%
+     residuals() %>%
+     as.vector()
+   
+   model_resid_original <- lm(resid_original ~ edu + smsa + married + 
+                                + resid_InZ, data = dados2)
+   stargazer(model_resid_original, type = "text")
+   
+   LMS <- length(model_resid_original %>% residuals()) * 
+     (model_resid_original %>%summary())$r.squared
+   pchisq(q = LMS, df = 30, lower.tail = F)
+   
+    # Overidentification test
+    model_resid_overid <- 
+      lm(model_2stage %>%residuals() ~ I(as.factor(qob):as.factor(yob)), data = dados2)
+    QS <- 20415 * 
+      (model_resid_overid %>%summary())$r.squared
+    pchisq(q = QS, df = 30, lower.tail = F)
+    
+```
+
+A partir do teste de Durbin Wu Watson não conseguimos rejeitar a hipótese nula de exogeneidade dos regressores pois temos um p-valor acima de 0.05, indicando que o estimador de OLS é consistente e preferível ao de 2SLS. Pelo p-valor do teste de "overidentification" não podemos rejeitar a hipótese nula de "overidentification".
+
+6)  Estimate now the IV regression using the two-stage procedure discussed in class. Are the estimates the same? What about the estimated standard deviation of the estimator?
+
+```{r}
+   IVmodel <- ivreg(logwage ~ edu + smsa + married|
+                      I(as.factor(qob):as.factor(yob))+ smsa + married, 
+                    data = dados2)
+   summary(IVmodel)
+
+```
+
+No caso desse modelo, tanto os desvios padrões como as estimações para as variáveis são um pouco diferentes dos resultados dos modelos anteriores. No geral os desvios padrões são um pouco maiores para esse modelo, e a estimação para o efeito de smsa no log dos salários é consideravelmente menor do que nos modelos anteriores.
+
+7.  
+
+```{r}
+  # Control function approach
+   
+   structural_model_reg <- lm(model_2stage %>%residuals() ~ 
+                                model_1stage %>%residuals())
+   
+   structural_model <- lm(logwage ~ 
+                            model_1stage %>% fitted.values() +
+                            married +
+                            smsa +
+                            structural_model_reg %>% fitted.values(),
+                          data = dados2)
+   stargazer(structural_model, type = "text")
+```
+
+Os resultados da estimação do coeficiente da variável educação foi idêntico ao da estimação pelo método de 2sls. Contudo, alguns coeficientes estimados foram um pouco diferentes para outras variáveis. Os desvios padrões, no geral, foram muito semelhantes.
+
+8.  A partir da saída da estimação pelo método de dois estágios da questão 6, obtemos também um teste para a fraqueza dos instrumentos, ou seja, que os instrumentos possuem baixa correlação com a variável explicativa endógena. No geral, podemos analisar o teste a partir da estatística F com base numa regra de bolso onde, se a estatística for maior que 10, temos que os instrumentos não são fracos. Contudo, nesse caso, como temos um grande número de instrumentos a regra de bolso não vale com uma estatística por volta de 10, ela deveria ser relativamente maior em correspondência ao número de instrumentos. Nesse caso, como a estatística F não é nem maior do que 10 não conseguimos rejeitar a hipótese nula de que os intrumentos são fracos.
+
+9\.
+
+```{r}
+   IVmodel2 <- ivreg(logwage ~ edu + smsa + married|
+                      as.factor(qob) + smsa + married, 
+                    data = dados2)
+   summary(IVmodel2)
+```
+
+Os resultados foram muito semelhantes aos resultados encontrados utilizando mais instrumentos. A diferença gira em torno de um coeficente associado a educação um pouco mais alto na estimação com menos instrumentos. Nesse caso como temos instrumentos fracos em ambas as estimações, é preferível utilizar o modelo com menos instrumentos. Apesar de um aumento da variância dos estimadores iv, podemos esperar que o viés aumente na estimação com maior número de instrumentos.
+
+10. 
