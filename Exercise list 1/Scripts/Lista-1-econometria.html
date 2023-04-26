@@ -512,7 +512,19 @@ experience<sup>2</sup> + 𝞫<sub>3</sub> female + 𝞫<sub>4</sub> educ</p>
     select(lnearning) %&gt;%
     as.matrix()
   xy &lt;- t(x)%*%y
-  βhat &lt;- solve(t(x)%*%x,t(x)%*%y)</code></pre>
+  βhat &lt;- solve(t(x)%*%x,t(x)%*%y)
+    n &lt;- nrow(y)
+  k &lt;- ncol(x)
+  e &lt;- y - x%*%βhat
+  S2 &lt;- (t(e) %*% e)/(n-k)
+  xx &lt;- solve(t(x)%*%x) 
+  S2</code></pre>
+<pre><code>##           lnearning
+## lnearning 0.3403983</code></pre>
+<p>Assuming homoskedasticity we have: S<sup>2</sup> = 0.34 as an
+unbiased estimator for the variance of the residuals. In this case, the
+estimator for the variance will be simply: (X’X)<sup>-1</sup>
+S<sup>2</sup></p>
 <p>X’Y</p>
 <pre><code>              lnearning
 intercept        541056
@@ -532,21 +544,13 @@ education      0.1140096302</code></pre>
 of the estimators. Do they differ? Which one do you prefer? Now estimate
 cluster-robust standard errors at the level of the region. Discuss
 whether this is a reasonable approach in this case.</p>
-<pre class="r"><code>  n &lt;- nrow(y)
-  k &lt;- ncol(x)
-  e &lt;- y - x%*%βhat
-  S2 &lt;- (t(e) %*% e)/(n-k)
-  xx &lt;- solve(t(x)%*%x) 
-  v0 &lt;- 0.3403983*xx  
+<pre class="r"><code>  v0 &lt;- 0.3403983*xx  
   s0 &lt;- sqrt(diag(v0)) #Assuming homoskedasticity (never use)
   u1 &lt;- x*(e%*%matrix(1,1,k))
   v1 &lt;- xx %*% (t(u1)%*%u1) %*% xx #Using White&#39;s formula and allowing for heteroskedasticity
   s1 &lt;- sqrt(diag(v1))</code></pre></li>
 </ol>
-<p>Assuming homoskedasticity we have: S<sup>2</sup> = 0.34 as an
-unbiased estimator for the variance of the residuals. In this case, the
-estimator for the variance will be simply: (X’X)<sup>-1</sup>
-S<sup>2</sup> And the standard errors of the estimators:</p>
+<p>The standard errors of the estimators:</p>
 <pre><code>    intercept    experience experiencesqr        female     education 
  1.767638e-02  9.773966e-04  1.707314e-05  5.243546e-03  9.483506e-04 </code></pre>
 <p>Allowing for heteroskedasticity, we can use an estimator of the

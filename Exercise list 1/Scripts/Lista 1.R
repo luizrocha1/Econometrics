@@ -123,14 +123,28 @@ install.load::install_load("tidyverse", "haven", "stargazer","sandwich")
 
   
   
-  model4 <- #just checking rs
+  v_clustered <- vcovCL()
+  xe <- x*rep(y-x%*%βhat,times=k)
+  region <- cps09mar %>% select(region) %>% as.matrix()
+  xe_sum <- rowsum(xe,region)
+  omega <- t(xe_sum)%*%xe_sum
+  G <- nrow(xe_sum)
+  scale <- G/(G-1)*(n-1)/(n-k)
+  V_clustered <- scale*solve(xx)%*%omega%*%solve(xx)
+  se_clustered <- sqrt(diag(V_clustered))
+  
+  
+  
+  
+  model4 <- 
     cps09mar %>%
     mutate(experience = age - 15) %>% 
     lm(formula = log(earnings) ~ experience + I(experience^2) + 
          female + education)
   stargazer(model4, type = "text")
   
-  vcov <- sandwich::vcovCL(model4,type = "HC0")
+  vcov_cl <- sandwich::vcovCL(model4,type = "HC0", cluster = ~region)
+  se_clustered <- sqrt(diag(vcov_cl))
   coeftest(model4, vcov = vcovCL, cluster = ~region)
   
   # 3) Compute homoskedastic and heteroskedastic-robust standard errors of
