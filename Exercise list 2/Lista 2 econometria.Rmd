@@ -5,14 +5,14 @@ date: "2023-04-18"
 output: html_document
 ---
 
-```{r}
+```{r include=FALSE}
  if (!require(install.load)) install.packages(install.load)
-install.load::install_load("tidyverse", "haven", "stargazer","sandwich", "aod", "ivreg") 
- 
+ install.load::install_load("tidyverse", "haven", "stargazer"
+                            ,"sandwich", "aod", "ivreg") 
 ```
 
-```{r}
- ak1991 <- read_dta("Exercise list 1/Data/data_unzip/econ_data.zip/ak1991/ak1991.dta")
+```{r include=FALSE}
+ ak1991 <- read_dta("AK1991.dta")
 ```
 
 1.  Restrict the sample only to black. Run an OLS regression of log wages on education, urban and married, as well as dummies for year-of-birth, state-of-birth and region-of-residence (these dummies do not need to be reported).
@@ -92,7 +92,7 @@ A partir do teste de Durbin Wu Watson não conseguimos rejeitar a hipótese nula
 
 No caso desse modelo, tanto os desvios padrões como as estimações para as variáveis são um pouco diferentes dos resultados dos modelos anteriores. No geral os desvios padrões são um pouco maiores para esse modelo, e a estimação para o efeito de smsa no log dos salários é consideravelmente menor do que nos modelos anteriores.
 
-7.  
+  7. 
 
 ```{r}
   # Control function approach
@@ -113,7 +113,7 @@ Os resultados da estimação do coeficiente da variável educação foi idêntic
 
 8.  A partir da saída da estimação pelo método de dois estágios da questão 6, obtemos também um teste para a fraqueza dos instrumentos, ou seja, que os instrumentos possuem baixa correlação com a variável explicativa endógena. No geral, podemos analisar o teste a partir da estatística F com base numa regra de bolso onde, se a estatística for maior que 10, temos que os instrumentos não são fracos. Contudo, nesse caso, como temos um grande número de instrumentos a regra de bolso não vale com uma estatística por volta de 10, ela deveria ser relativamente maior em correspondência ao número de instrumentos. Nesse caso, como a estatística F não é nem maior do que 10 não conseguimos rejeitar a hipótese nula de que os intrumentos são fracos.
 
-9\.
+  9.
 
 ```{r}
    IVmodel2 <- ivreg(logwage ~ edu + smsa + married|
@@ -124,4 +124,6 @@ Os resultados da estimação do coeficiente da variável educação foi idêntic
 
 Os resultados foram muito semelhantes aos resultados encontrados utilizando mais instrumentos. A diferença gira em torno de um coeficente associado a educação um pouco mais alto na estimação com menos instrumentos. Nesse caso como temos instrumentos fracos em ambas as estimações, é preferível utilizar o modelo com menos instrumentos. Apesar de um aumento da variância dos estimadores iv, podemos esperar que o viés aumente na estimação com maior número de instrumentos.
 
-10. 
+10. Como explicitado, em certas ocasiões os instrumentos identificam o LATE. Isso ocorre porque em algumas situações o ATE não pode ser identificado (quando temos variáveis endógenas binárias e instrumentos binários) por conta de efeitos heterogêneos do tratamento. De acordo com essa intepretação, um trabalho que utilize uma regressão IV para estimar os retornos da educação utilizando proximidade da escola como instrumento, estaria na verdade estimando o LATE, ou seja, a interpretação dos resultados deveria ser: o retorno médio da educação para uma pessoa que adquire um ano a mais de educação somente por conta da proximidade da escola, e que deixaria de adquirir se não existisse escola próxima.
+
+11. Podemos pensar em como essas duas variáveis podem violar a restrição de exclusão. Em certas situações podemos acabar utilizando um instrumento que afeta nosso outcome não apenas através de uma única variável endógena, o que fere a restrição de exclusão. Além disso, é possível que mesmo controlando por essa segunda variável que pode ser "instrumentada" por nosso instrumento inicial, não possamos identificar o efeito da variável endógena inicial no outcome. Nesses casos é preferível evitar a utilização desses instrumentos. No caso em análise, podemos pensar que pessoas que moram na mesma região e com condições parecidas, tendem a se casar com pessoas que compartilham níveis educacionais e financeiros parecidos. É plausível que a renda e o nível educacional do parceiro tenha algum impacto na renda de um indivíduo. 

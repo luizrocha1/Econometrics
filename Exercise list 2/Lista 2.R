@@ -35,8 +35,8 @@
  if (!require(install.load)) install.packages(install.load)
  install.load::install_load("tidyverse", "haven", "stargazer"
                             ,"sandwich", "aod", "ivreg") 
- 
- dados <- read_dta("Exercise list 1/Data/data_unzip/econ_data.zip/ak1991/ak1991.dta")
+
+  ak1991 <- read_dta("Exercise list 1/Data/data_unzip/econ_data.zip/ak1991/ak1991.dta")
  
  
   dados1 <- ak1991 %>%
