@@ -1,0 +1,231 @@
+---
+title: "Lista 3"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: "2023-05-10"
+output: html_document
+---
+
+```{r}
+if (!require(install.load)) install.packages(install.load)
+install.load::install_load("tidyverse", "haven", "stargazer"
+                           ,"fixest", "sandwich", "ivreg") 
+```
+
+```{r}
+    ds2004 <- read_dta("Exercise list 3/DS2004/DS2004.dta") %>%
+      mutate(Periodo_tratamento = as.numeric(month > 6))
+```
+
+1)  Aggregate the data and run a 2-by-2 diff-in-diff. Construct the 2-by-2 table (like in the slides or textbook), and add the standard deviation of the estimates. Interpret.
+
+```{r}
+    did1 <- 
+      ds2004 %>%
+      feols(thefts ~ sameblock:Periodo_tratamento + sameblock +
+              Periodo_tratamento)
+      summary(did1)
+      etable(did1)
+```
+
+Nesse caso o DiD está tentando estimar os possíveis efeitos do policiamento na redução de assaltos a veículos. Ele faz isso comparando o efeito do policiamento em blocos que possuem instituições judáicas - onde receberam um choque exógeno positivo no policiamento por conta de um ataque terrorista que tinha como alvo esse tipo de instituição - com os que não possuem. Os resultados apontam que houve uma diminuição de 7,9% nos assaltos após o período de tratamento.
+
+2)  Run the canonical DiD regression and a 2WFE regression. Are the results the same?
+
+```{r}
+    did2 <- 
+      ds2004 %>%
+      feols(thefts ~ sameblock:i(month,7) + sameblock + 
+              factor(month))
+    summary(did2)
+    iplot(did2)
+```
+
+```{r}
+ TWFE <- 
+      ds2004 %>%
+      filter(month == 6 | month == 8) %>%
+      feols(thefts ~ sameblock:Periodo_tratamento + sameblock +
+              Periodo_tratamento)
+    summary(TWFE)   
+```
+
+Os resultados do modelo canônico de regressão DiD são bem semelhantes aos encontrados no primeiro exercício, contudo, o resultado encontrado no 2WFE aponta para uma redução um pouco maior de 11,5% nos assaltos a veículos após o mês de tratamento.
+
+3)  What about if you add controls? Which controls you consider reasonable? Why? Discuss the conditional ignorability of the model, with and without controls.
+
+```{r}
+  did3 <- 
+      ds2004 %>%
+      feols(thefts ~ sameblock:i(month,7) + sameblock + 
+              factor(month) | bank)
+    summary(did3)
+    iplot(did3)
+```
+
+Controlar para a presença ou ausência de bancos no mesmo bloco parece, a primeira vista, um controle adequado pois, é plausível que blocos que possuem bancos apresentem características de policiamento mais forte, de modo que um bloco apresente um aumento no policiamento pós tratamento por conta, justamente, da presença do banco. A identificação do efeito do policiamento nos números de assaltos a veículos pode ser comprometida por conta de blocos que apresentam trajetórias diferentes do fluxo de policiamento por conta da presença de um banco no bloco.
+
+4)  Estimate the standard deviation of the model assuming spherical errors, heteroskedasticity, and autocorrelation. Are the results similar? Which would you use?
+
+```{r}
+    did4 <- 
+      ds2004 %>%
+      feols(thefts ~ sameblock:i(month,7) + sameblock + 
+              factor(month) | bank, panel.id = ~month+block, 
+            vcov = "NW")
+    summary(did4)
+```
+
+Os resultados apresentam desvios padrões maiores para os parâmetros estimados. Isso ocorre por conta dos regressores que são "demeaned", ampliando a variância dos estimadores, se não utilizássemos os modelos robustos a heterocedasticidade e autocorrelação, estaríamos subestimando os desvios padrões do modelo. Apesar do comprometimento em termos de eficiência, os modelos FE e DiD são robustos a endogeneidade do componente de erro invariante no tempo, portanto, precisamos usá-los corrigindo ajustando a heterocedasiticidade e autocorrelação.
+
+5)  Plot the average car theft in treatment and control blocks. Are the trends parallel? Estimate a dynamic diff-in-diff and plot it. Interpret.
+
+```{r}
+    average_car_theft=matrix(NA,ncol = 2,nrow = length(table(ds2004$month)))
+    for (k in 1:nrow(average_car_theft)){
+      dados_temp=ds2004[ds2004$month==k+3,]
+      average_car_theft[k,1]=mean(as.numeric(dados_temp$thefts[dados_temp$sameblock==0]))
+      average_car_theft[k,2]=mean(as.numeric(dados_temp$thefts[dados_temp$sameblock==1]))
+      rm(dados_temp)
+    }
+    plot(x=seq(4,12,1),average_car_theft[,1],type = 'l',ylim = c(-0.1,0.2),ylab = "Mean of thefts")
+    lines(x=seq(4,12,1),average_car_theft[,2],col="red")
+```
+
+6)  
+
+7)  Now consider the variable "oneblock", which denotes whether there is a Jewish institution 1 block away. Do the effects extend an extra block?
+
+```{r}
+    did5 <- 
+      ds2004 %>%
+      mutate(Novo_Tratamento = 
+               as.numeric(sameblock + oneblock > 0)) %>%
+      feols(thefts ~ Novo_Tratamento:Periodo_tratamento + 
+              Novo_Tratamento + Periodo_tratamento, 
+            panel.id = ~month+block, vcov = "NW")
+    summary(did5)
+```
+
+Pelo que os resultados indicam, os efeitos se extendem a um bloco de maneira bem mais modesta do que no mesmo bloco, diminuindo os assaltos a veículos em 1,5%.
+
+8)  Estimate a synthetic control model to check how the terrorist attack affected car theft in the block of the Asociación.
+
+```{r}
+    dados=as.data.frame(ds2004)
+    dados_output=dataprep(
+      foo=dados,
+      predictors = c("distance","gasstation","bank"),
+      predictors.op = "mean",
+      time.predictors.prior = 4:6,
+      dependent = "thefts",
+      unit.variable = "block",
+      time.variable = "month",
+      treatment.identifier = 797,
+      controls.identifier = c(1:796,798:876),
+      time.optimize.ssr = 4:6,
+      time.plot = 4:12
+    )
+    
+    synth.out = synth(data.prep.obj = dados_output, method = "BFGS")
+    
+    contrafactual=dados_output$Y0plot %*% synth.out$solution.w
+    
+    path.plot(synth.res = synth.out, dataprep.res = dados_output,
+              Ylim = c(-.1, 0.2), Legend = c("797", "contrafactual 797"), Legend.position = "bottomright")
+    
+    tratados_thefts=dados$thefts[dados$month>6]
+    ATT=tratados_thefts[(length(tratados_thefts)-5):length(tratados_thefts)]-contrafactual[(length(contrafactual)-5):length(contrafactual)]
+```
+
+![](http://127.0.0.1:26323/graphics/241474d0-efc4-4a1e-b510-1626af6a9ddf.png)
+
+9)  
+
+10) Run a pooled OLS regression of sameblock interacted with post July and the controls you used above. Is the result different? What does this say about the endogeneity of the treatment? Be precise.
+
+```{r}
+    pooled_reg <-
+      plm(thefts ~ sameblock:Periodo_tratamento + bank + gasstation +
+            +Periodo_tratamento + sameblock, model = "pooling", data = ds2004,
+          index = c("block","month"), effect = "individual")
+    summary(pooled_reg)
+```
+
+Com relação a primeira estimação do DiD os resultados em termos de estimação foram os mesmos, enquanto que com relação ao TWFE o resultado parece subestimado em termos de redução dos assaltos a veículos pós tratamento. Isso ocorre pois temos uma interpretação bem clara sobre a endogeneidade do tratamento, que necessita de strict mean independence tornando a identificação mais difícil, ou seja, assumimos que temos um componente de erro a nível de indivíduo não observado que é não correlacionado com os regressores para todos os períodos de tempo (ignorando a estrutura de painel).
+
+11) Now add time-specific error components. They alter the results? Interpret.
+
+```{r}
+    pooled_reg2 <-
+      plm(thefts ~ sameblock:Periodo_tratamento + 
+            bank + gasstation + Periodo_tratamento + sameblock,
+                   data = ds2004,model = "pooling",index = 
+            c("block","month"),effect = "twoways",method = "walhus")
+    summary(pooled_reg2)
+```
+
+Após adicionar o componente específico do erro de tempo não ocorre nenhuma diferença em nenhum aspecto da estimação. Isso ocorre pelas próprias hipóteses que fazemos acerca dos erros na estimação da pooled regression, que são não correlacionados com os regressores em nenhum período do tempo (strict mean independence).
+
+12) Now run a random effects model. Compare the estimatives and their variance of all the estimators above. What do you see and what did you expect? Why?
+
+```{r}
+  random_reg <- 
+    plm(thefts ~ sameblock:Periodo_tratamento + 
+            bank + gasstation + Periodo_tratamento + sameblock,
+          data = ds2004, model = "random", index = c("block","month"),
+          random.method = "ht")
+    summary(random_reg)
+```
+
+O resultado encontrado segue o que era esperado. O modelo de random effects, em vez de tentar considerar uma estrutura de componente de erro, aborda a estimação a partir de um estimador de GLS de maneira a atingir uma maior eficiência. Contudo, a hipótese de identificação e os valores encontrados para os estimadores são os mesmos, e de fato é isso que é encontrado nas regressões rodadas acima.
+
+13) Do a Hausman test on whether the treatment is exogenous regarding individual-specific error components. Interpret.
+
+```{r}
+    phtest(random_reg, TWFE)
+```
+
+A grande questão do teste de Hausman gira em torno de quando a especificação da média condicional do erro específico a nível de indivíduo e invarante no tempo, pode ser tido como independente dos regressores ou não. Por exemplo, se quisermos estimar o efeito da educação no salário ao longo do tempo, se tivermos uma variável não obsevada que afeta a educação e possui um efeito adicional no salário, essa hipótese é quebrada e, nesse caso, o estimador de um modelo random effects é viesado e inconsitente, enquanto que um de fixed effects é recomendável. Uma maneira de interpretar essa questão é com relação a uma possível endogeneidade do tratamento com relação aos componentes de erro ao nível de indivíduo, onde podemos encontrar uma variável que fere a suposição de exogeneidade necessária para o uso do modelo de random effects.
+
+14) Since we do not have that many observations, and they are spatially correlated, we might be worried about our inference. Do a placebo test, randomly selecting localities as treated and control groups. Plot a histogram with their distribution, and denote the actual treatment effect. What is the probability you estimated like this of our result being purely by chance?
+
+```{r}
+set.seed(1234)
+rdm=round(runif(200,1,876),0)
+dados[,ncol(dados)+1]=0
+names(dados)[ncol(dados)]="grupo_tratado"
+for (k in rdm){
+  for(j in 1:nrow(dados)){
+   if(dados$block[j]==k)dados$grupo_tratado[j]=1
+  }
+}
+hist(dados$thefts[dados$grupo_tratado==1])
+hist(dados$thefts[dados$grupo_tratado==0])
+dados[,ncol(dados)+1]=as.numeric(dados$grupo_tratado+dados$Periodo_tratamento>1)
+names(dados)[ncol(dados)]="tratados"
+rm(contrafactual)
+mean_thetfs_controle_pre=mean(dados$thefts[which(dados$Periodo_tratamento[which(dados$grupo_tratado==0)]==0)])
+mean_thetfs_controle_pos=mean(dados$thefts[which(dados$Periodo_tratamento[which(dados$grupo_tratado==0)]==1)])
+mean_thetfs_tratado_pre=mean(dados$thefts[which(dados$Periodo_tratamento[which(dados$grupo_tratado==1)]==0)])
+contrafactual=mean_thetfs_controle_pos-mean_thetfs_controle_pre+mean_thetfs_tratado_pre
+
+ATT=mean(dados$thefts[dados$tratados==1])-contrafactual
+```
+
+15) Let's pretend the authors had data on police presence (see the code below). It is reasonable to expect police presence to be endogenous, so we can use "sameblock" interacted with "after july" as an instrument in a 2WFE regression. Run that and a normal 2WFE and compare. Present all the important information and discuss in detail the results.
+
+```{r}
+dados$post_treat <- dados$month > 6
+u <- feols(thefts ~ 1 | month + block, data = dados)
+
+dados$police <- 10*round(u$residuals*20) + 50*dados$sameblock*dados$post_treat +
+  70*dados$sameblock + 100*dados$public + 100*dados$bank + 
+  50*dados$gasstation + 100*(dados$barrio == "Once") + 
+  sample(100:500, size = 7884, replace = TRUE)
+
+twowfe=feols(thefts~grupo_tratado:Periodo_tratamento|Periodo_tratamento+grupo_tratado,data=dados)
+summary(twowfe)
+
+normal_twowfe=feols(thefts~police|Periodo_tratamento+grupo_tratado,data=dados)
+summary(normal_twowfe)
+```
