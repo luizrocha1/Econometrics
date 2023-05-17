@@ -1,4 +1,4 @@
-/# <<<<<<<<<<<<>>>>>>>>>>>><<<<<<<<<<<<>>>>>>>>>>>><<<<<<<<<<<<>>>>>>>>>>>>
+# <<<<<<<<<<<<>>>>>>>>>>>><<<<<<<<<<<<>>>>>>>>>>>><<<<<<<<<<<<>>>>>>>>>>>>
   #
   # Project: 
   #
@@ -32,12 +32,19 @@
 
 # Install and load packages ----
 
+
 if (!require(install.load)) install.packages(install.load)
 install.load::install_load("tidyverse", "haven", "stargazer"
                            ,"fixest", "sandwich", "ivreg", "optimx","lme4",
-                           "plm", "kernlab") 
-library(devtools)
+                           "plm", "kernlab", "remotes","future", "rlang") 
+library(Synth)
+install_github("bcastanho/SCtools")
+library(SCtools)
 install.packages("SCtools")
+library(SCtools)
+install_version("LowRankQP", "1.0.5")
+install_version("Synth", "1.1.6")
+
 # Reading and ggregating data
 
 ds2004 <- read_dta("Exercise list 3/DS2004/DS2004.dta") %>%
@@ -115,72 +122,22 @@ summary(did5)
 
 ##########QUESTAO 8###########
 
-smoking_out <-
-  
-  ds2004 %>%
-  
-  # initial the synthetic control object
-  synthetic_control(outcome = thefts, # outcome
-                    unit = block, # unit index in the panel data
-                    time = month, # time index in the panel data
-                    i_unit = "797", # unit where the intervention occurred
-                    i_time = 6, # time period when the intervention occurred
-                    generate_placebos=T # generate placebo synthetic controls (for inference)
-  ) %>% 
-  generate_predictor(time_window = 4:6,
-                     dist = mean(distance, na.rm = T),
-                     b = mean(bank, na.rm = T),
-                     gas = mean(gasstation, na.rm = T)) %>%
-  
-  generate_weights(optimization_window = 4:6, # time to use in the optimization task
-                   margin_ipop = .02,sigf_ipop = 7,bound_ipop = 6 # optimizer options
-  ) %>%
-  
-  # Generate the synthetic control
-  generate_control()
-  
-  # Generate the aggregate predictors used to fit the weights
-  
-  # average log income, retail price of cigarettes, and proportion of the
-  # population between 15 and 24 years of age from 1980 - 1988
-  generate_predictor(time_window = 4:6,
-                     ln_income = mean(lnincome, na.rm = T),
-                     ret_price = mean(retprice, na.rm = T),
-                     gas = mean(gasstation, na.rm = T)) %>%
-  
-  # average beer consumption in the donor pool from 1984 - 1988
-  generate_predictor(time_window = 1984:1988,
-                     beer_sales = mean(beer, na.rm = T)) %>%
-  
-  # Lagged cigarette sales 
-  generate_predictor(time_window = 1975,
-                     cigsale_1975 = cigsale) %>%
-  generate_predictor(time_window = 1980,
-                     cigsale_1980 = cigsale) %>%
-  generate_predictor(time_window = 1988,
-                     cigsale_1988 = cigsale) %>%
-  
-  
-  # Generate the fitted weights for the synthetic control
-  generate_weights(optimization_window = 4:6, # time to use in the optimization task
-                   margin_ipop = .02,sigf_ipop = 7,bound_ipop = 6 # optimizer options
-  ) %>%
-  
-  # Generate the synthetic control
-  generate_control()
+ds2004 %>%
+  arrange(block) %>% view()
+  filter()
 
 
 dados=as.data.frame(ds2004)
 dados_output <- dataprep(
   foo=dados,
-  predictors = c("distance","gasstation","bank"),
+  predictors = c("distance","bank"),
   predictors.op = "mean",
   time.predictors.prior = 4:6,
   dependent = "thefts",
   unit.variable = "block",
   time.variable = "month",
   treatment.identifier = 797,
-  controls.identifier = c(1:796,798:876),
+  controls.identifier = c(1:100,798:876),
   time.optimize.ssr = 4:6,
   time.plot = 4:12
 )
@@ -195,12 +152,59 @@ path.plot(synth.res = synth.out, dataprep.res = dados_output,
 tratados_thefts=dados$thefts[dados$month>6]
 ATT=tratados_thefts[(length(tratados_thefts)-5):length(tratados_thefts)]-contrafactual[(length(contrafactual)-5):length(contrafactual)]
 
+###############################################
+dataprep_out <- dataprep(
+  foo = dados,
+  predictors = c("distance","gasstation","bank"),
+  predictors.op = "mean",
+  time.predictors.prior = 4:6,
+  dependent = "thefts",
+  unit.variable = "block",
+  time.variable = "month",
+  treatment.identifier = 797,
+  controls.identifier = c(1:100,798:876),
+  time.optimize.ssr = 4:6,
+  time.plot = 4:12
+)
 
-placebos <- generate.placebos(dados_output, synth_out, Sigf.ipop = 3)
+synth_out <- synth(data.prep.obj = dataprep_out)
+path.plot(synth_out, dataprep_out)
+
+
+
+dados=as.data.frame(dados)
+dados_output <- dataprep(
+  foo=dados,
+  predictors = c("distance","gasstation","bank"),
+  predictors.op = "mean",
+  time.predictors.prior = 4:6,
+  dependent = "thefts",
+  unit.variable = "block",
+  time.variable = "month",
+  treatment.identifier = 797,
+  controls.identifier = c(1:100,798:876),
+  time.optimize.ssr = 4:6,
+  time.plot = 4:12
+)
+
+synth.out = synth(data.prep.obj = dados_output, method = "BFGS")
+
+contrafactual=dados_output$Y0plot %*% synth.out$solution.w
+
+path.plot(synth.res = synth.out, dataprep.res = dados_output,
+          Ylim = c(-.1, 0.2), Legend = c("797", "contrafactual 797"), Legend.position = "bottomright")
+
+tratados_thefts=dados$thefts[dados$month>6]
+ATT=tratados_thefts[(length(tratados_thefts)-5):length(tratados_thefts)]-contrafactual[(length(contrafactual)-5):length(contrafactual)]
+
+placebos <- generate.placebos(dados_output, synth_out,strategy = "multisession", Sigf.ipop = 2)
 plot_placebos(placebos)
+placebos
 
 mspe.plot(placebos, discard.extreme = TRUE, mspe.limit = 1, plot.hist = TRUE)
+ 
 
+##############################################
 pooled_reg <-
   plm(thefts ~ sameblock:Periodo_tratamento + bank + gasstation +
         +Periodo_tratamento + sameblock, model = "pooling", data = ds2004,
@@ -233,20 +237,20 @@ phtest(random_reg, TWFE)
 set.seed(1234)
 rdm=round(runif(200,1,876),0)
 dados[,ncol(dados)+1]=0
-names(dados)[ncol(dados)]="grupo_tratado"
+names(dados)[ncol(dados)]="sameblock"
 for (k in rdm){
   for(j in 1:nrow(dados)){
-    if(dados$block[j]==k)dados$grupo_tratado[j]=1
+    if(dados$block[j]==k)dados$sameblock[j]=1
   }
 }
-hist(dados$thefts[dados$grupo_tratado==1])
-hist(dados$thefts[dados$grupo_tratado==0])
-dados[,ncol(dados)+1]=as.numeric(dados$grupo_tratado+dados$Periodo_tratamento>1)
+hist(dados$thefts[dados$sameblock==1])
+hist(dados$thefts[dados$sameblock==0])
+dados[,ncol(dados)+1]=as.numeric(dados$sameblock+dados$sameblock>1)
 names(dados)[ncol(dados)]="tratados"
 rm(contrafactual)
-mean_thetfs_controle_pre=mean(dados$thefts[which(dados$Periodo_tratamento[which(dados$grupo_tratado==0)]==0)])
-mean_thetfs_controle_pos=mean(dados$thefts[which(dados$Periodo_tratamento[which(dados$grupo_tratado==0)]==1)])
-mean_thetfs_tratado_pre=mean(dados$thefts[which(dados$Periodo_tratamento[which(dados$grupo_tratado==1)]==0)])
+mean_thetfs_controle_pre=mean(dados$thefts[which(dados$sameblock[which(dados$sameblock==0)]==0)])
+mean_thetfs_controle_pos=mean(dados$thefts[which(dados$sameblock[which(dados$sameblock==0)]==1)])
+mean_thetfs_tratado_pre=mean(dados$thefts[which(dados$sameblock[which(dados$sameblock==1)]==0)])
 contrafactual=mean_thetfs_controle_pos-mean_thetfs_controle_pre+mean_thetfs_tratado_pre
 
 ATT=mean(dados$thefts[dados$tratados==1])-contrafactual

@@ -5,14 +5,18 @@ date: "2023-05-10"
 output: html_document
 ---
 
-```{r}
+```{r include=FALSE}
 if (!require(install.load)) install.packages(install.load)
 install.load::install_load("tidyverse", "haven", "stargazer"
-                           ,"fixest", "sandwich", "ivreg") 
+                           ,"fixest", "sandwich", "ivreg", "optimx","lme4",
+                           "plm", "kernlab", "remotes","future", "rlang") 
+library(Synth)
+library(SCtools)
+
 ```
 
 ```{r}
-    ds2004 <- read_dta("Exercise list 3/DS2004/DS2004.dta") %>%
+    ds2004 <- read_dta("DS2004.dta") %>%
       mutate(Periodo_tratamento = as.numeric(month > 6))
 ```
 
@@ -89,9 +93,15 @@ Os resultados apresentam desvios padrões maiores para os parâmetros estimados.
     }
     plot(x=seq(4,12,1),average_car_theft[,1],type = 'l',ylim = c(-0.1,0.2),ylab = "Mean of thefts")
     lines(x=seq(4,12,1),average_car_theft[,2],col="red")
+   DiDdin <- 
+      ds2004 %>%
+      filter(month == 6 | month == 8) %>%
+      feols(thefts ~ sameblock:Periodo_tratamento + sameblock +
+              Periodo_tratamento)
+   DiDdin
 ```
 
-6)  
+6)  Pelos gráficos, é possível perceber que depois do mês 8 a tendência no valor médio de roubos para os grupos é lateralizar. Contudo, o nível médio de roubos para o grupo controle fica sempre acima do grupo tratado, logo, é um efeito long-living.
 
 7)  Now consider the variable "oneblock", which denotes whether there is a Jewish institution 1 block away. Do the effects extend an extra block?
 
@@ -110,7 +120,7 @@ Pelo que os resultados indicam, os efeitos se extendem a um bloco de maneira bem
 
 8)  Estimate a synthetic control model to check how the terrorist attack affected car theft in the block of the Asociación.
 
-```{r}
+```{r eval=FALSE, include=FALSE}
     dados=as.data.frame(ds2004)
     dados_output=dataprep(
       foo=dados,
@@ -140,6 +150,15 @@ Pelo que os resultados indicam, os efeitos se extendem a um bloco de maneira bem
 ![](http://127.0.0.1:26323/graphics/241474d0-efc4-4a1e-b510-1626af6a9ddf.png)
 
 9)  
+
+```{r eval=FALSE, include=FALSE}
+placebos <- generate.placebos(dados_output, synth_out,strategy = "multisession", Sigf.ipop = 2)
+plot_placebos(placebos)
+```
+
+Para esse caso, o resultado parece improvável pois, dentre os controles sintéticos com bom ajuste pré-tratamento, existem alguns controles específicos com valor mais divergente que o 797 no plot abaixo da série de tempo.
+
+![](Rplot03.png)
 
 10) Run a pooled OLS regression of sameblock interacted with post July and the controls you used above. Is the result different? What does this say about the endogeneity of the treatment? Be precise.
 
@@ -189,14 +208,16 @@ A grande questão do teste de Hausman gira em torno de quando a especificação 
 
 14) Since we do not have that many observations, and they are spatially correlated, we might be worried about our inference. Do a placebo test, randomly selecting localities as treated and control groups. Plot a histogram with their distribution, and denote the actual treatment effect. What is the probability you estimated like this of our result being purely by chance?
 
+
 ```{r}
+dados=as.data.frame(ds2004)
 set.seed(1234)
 rdm=round(runif(200,1,876),0)
 dados[,ncol(dados)+1]=0
 names(dados)[ncol(dados)]="grupo_tratado"
 for (k in rdm){
   for(j in 1:nrow(dados)){
-   if(dados$block[j]==k)dados$grupo_tratado[j]=1
+    if(dados$block[j]==k)dados$grupo_tratado[j]=1
   }
 }
 hist(dados$thefts[dados$grupo_tratado==1])
@@ -212,6 +233,8 @@ contrafactual=mean_thetfs_controle_pos-mean_thetfs_controle_pre+mean_thetfs_trat
 ATT=mean(dados$thefts[dados$tratados==1])-contrafactual
 ```
 
+  Nesse caso temos altas chances de termos estimado o efeito por acaso. Podemos ver pelo histograma que diversos placebos construídos apresentam resultado semelhante com o encontrado, de modo que nosso controle não se apresenta como divergente diante do resto.
+
 15) Let's pretend the authors had data on police presence (see the code below). It is reasonable to expect police presence to be endogenous, so we can use "sameblock" interacted with "after july" as an instrument in a 2WFE regression. Run that and a normal 2WFE and compare. Present all the important information and discuss in detail the results.
 
 ```{r}
@@ -223,7 +246,7 @@ dados$police <- 10*round(u$residuals*20) + 50*dados$sameblock*dados$post_treat +
   50*dados$gasstation + 100*(dados$barrio == "Once") + 
   sample(100:500, size = 7884, replace = TRUE)
 
-twowfe=feols(thefts~grupo_tratado:Periodo_tratamento|Periodo_tratamento+grupo_tratado,data=dados)
+twowfe=feols(thefts~sameblock:Periodo_tratamento|Periodo_tratamento+sameblock,data=dados)
 summary(twowfe)
 
 normal_twowfe=feols(thefts~police|Periodo_tratamento+grupo_tratado,data=dados)
