@@ -201,10 +201,9 @@ O resultado encontrado segue o que era esperado. O modelo de random effects, em 
 13) Do a Hausman test on whether the treatment is exogenous regarding individual-specific error components. Interpret.
 
 ```{r}
-    phtest(random_reg, TWFE)
+    phtest(random_reg, pooled_reg2)
 ```
-
-A grande questão do teste de Hausman gira em torno de quando a especificação da média condicional do erro específico a nível de indivíduo e invarante no tempo, pode ser tido como independente dos regressores ou não. Por exemplo, se quisermos estimar o efeito da educação no salário ao longo do tempo, se tivermos uma variável não obsevada que afeta a educação e possui um efeito adicional no salário, essa hipótese é quebrada e, nesse caso, o estimador de um modelo random effects é viesado e inconsitente, enquanto que um de fixed effects é recomendável. Uma maneira de interpretar essa questão é com relação a uma possível endogeneidade do tratamento com relação aos componentes de erro ao nível de indivíduo, onde podemos encontrar uma variável que fere a suposição de exogeneidade necessária para o uso do modelo de random effects.
+  A grande questão do teste de Hausman gira em torno de quando a especificação da média condicional do erro específico a nível de indivíduo e invarante no tempo, pode ser tido como independente dos regressores ou não. Por exemplo, se quisermos estimar o efeito da educação no salário ao longo do tempo, se tivermos uma variável não obsevada que afeta a educação e possui um efeito adicional no salário, essa hipótese é quebrada e, nesse caso, o estimador de um modelo random effects é viesado e inconsitente, enquanto que um de fixed effects é recomendável. Uma maneira de interpretar essa questão é com relação a uma possível endogeneidade do tratamento com relação aos componentes de erro ao nível de indivíduo, onde podemos encontrar uma variável que fere a suposição de exogeneidade necessária para o uso do modelo de random effects. Nesse caso, se a especificação do random effects está correta os dois estimadores deveriam ser bem próximos um do outro (Hipótese nula rejeitada), que é o caso ocorrido no teste realizado. 
 
 14) Since we do not have that many observations, and they are spatially correlated, we might be worried about our inference. Do a placebo test, randomly selecting localities as treated and control groups. Plot a histogram with their distribution, and denote the actual treatment effect. What is the probability you estimated like this of our result being purely by chance?
 
@@ -231,6 +230,7 @@ mean_thetfs_tratado_pre=mean(dados$thefts[which(dados$Periodo_tratamento[which(d
 contrafactual=mean_thetfs_controle_pos-mean_thetfs_controle_pre+mean_thetfs_tratado_pre
 
 ATT=mean(dados$thefts[dados$tratados==1])-contrafactual
+ATT
 ```
 
   Nesse caso temos altas chances de termos estimado o efeito por acaso. Podemos ver pelo histograma que diversos placebos construídos apresentam resultado semelhante com o encontrado, de modo que nosso controle não se apresenta como divergente diante do resto.
@@ -246,9 +246,10 @@ dados$police <- 10*round(u$residuals*20) + 50*dados$sameblock*dados$post_treat +
   50*dados$gasstation + 100*(dados$barrio == "Once") + 
   sample(100:500, size = 7884, replace = TRUE)
 
-twowfe=feols(thefts~sameblock:Periodo_tratamento|Periodo_tratamento+sameblock,data=dados)
+twowfe=feols(thefts~sameblock:Periodo_tratamento|Periodo_tratamento+sameblock,data=ds2004)
 summary(twowfe)
 
 normal_twowfe=feols(thefts~police|Periodo_tratamento+grupo_tratado,data=dados)
 summary(normal_twowfe)
 ```
+    Diferente da regressão normal, quando tratamos a presença do policiamento incluindo-a como covariada, o efeito estimado aparece positivo, o que pode parecer contraintuitivo com os resultados apresentados até o momento e diante da estimação já realizada em que o efeito era negativo. Contudo, nesse caso estamos pensando que a alocação do policiamento é destinada a locais onde a violência é maior, ou seja, ela é positivamente correlacionada com áreas mais violentas, e não estamos estimando exatamente o efeito causal do policiamento na violência (paradoxo de Simpson). Quando  utilizamos o policiamento como instrumento chegamos ao resultado encontrado nas outras estimações.
