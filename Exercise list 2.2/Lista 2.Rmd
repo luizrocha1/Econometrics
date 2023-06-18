@@ -1,0 +1,287 @@
+---
+title: "Lista 2"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: "2023-06-16"
+output: html_document
+---
+```{r message=FALSE, warning=FALSE}
+ # Install and load packages ----
+ if (!require(install.load)) install.packages(install.load)
+ install.load::install_load("tidyverse", "data.table","sfsmisc","MASS") 
+```
+
+1) Crie uma amostra aleatória de 50 observações, normalmente distribuída, com média igual ao primeiro algarismo do seu número USP e desvio-padrão igual ao último algoritmo do seu número USP.
+
+```{r message=FALSE, warning=FALSE}
+ 
+ set.seed(14664824)
+
+ LN_samp1 <- rnorm(50, 1, 4) 
+ LN_samp1
+```
+2) Crie uma função no R, com dois argumentos, um deles um vetor de parâmetros (média e desviopadrão), e outro o banco de dados. Esta função deve retornar o negativo da função log-verossimilhança
+para a amostra, avaliada para um valor do vetor de parâmetros e o banco de dados do item anterior.
+
+```{r}
+ loglike <- function(Theta, df){
+   
+   n <- length(df)
+   
+   loglik <- -n/2*log(2*pi) - n*log(Theta[2]) - sum((df-Theta[1])^2)/(2*Theta[2]^2)
+   
+   return(-loglik)
+   
+ }
+ 
+ loglike(c(1,4), LN_samp1)
+```
+
+3) Faça um gráco mostrando o valor da função de verossimilhança para diferentes valores de média e desvio-padrão.
+
+```{r}
+ # Primeiro fixando o parâmetro sigma em 4 e plotando para um range de parâmetros mu
+ 
+ loglike_mu <- function(mu, df){
+   
+   n <- length(df)
+   
+   loglik <- -n/2*log(2*pi) - n*log(4) - sum((df-mu)^2)/(2*4^2)
+   
+   return(-loglik)
+   
+ }
+  
+  range_mu <- seq(1, 50, length.out=500)
+  
+  llks_mu <- map(range_mu, loglike_mu, LN_samp1)
+  
+  plot(range_mu, llks_mu ,main = "-Log Likelihood",
+       xlab = "mu", ylab = "Log Likelihood",
+       pch = 19, frame = FALSE)
+  
+ # Agora fazendo o mesmo porém fixando mu em 1 e variando sigma
+  
+  loglike_sigma <- function(sigma, df){
+   
+   n <- length(df)
+   
+   loglik <- -n/2*log(sigma*pi) - n*log(4) - sum((df-1)^2)/(2*sigma^2)
+   
+   return(-loglik)
+   
+ }
+  
+  range_sigma <- seq(1, 50, length.out=500)
+  
+  llks_sigma <- map(range_sigma, loglike_sigma, LN_samp1)
+  
+  plot(range_sigma, llks_sigma ,main = "-Log Likelihood",
+       xlab = "sigma", ylab = "Log Likelihood",
+       pch = 19, frame = FALSE)
+```
+
+4) Estime os valores da média e desvio-padrão para esta amostra, por meio da maximização da função verossimilhança escrita anteriormente.
+
+```{r}
+  start = c(2,3)
+  
+  Theta <- optim(start, loglike, df = LN_samp1,hessian = T, method = "BFGS")
+  
+  Theta$par
+```
+
+
+5) Calcule a matriz de variância-covariância dos coeficientes para esta amostra. Podemos rejeitar a hipótese que esses coefientes são iguais aos valores que usamos pra criar a amostra no primeiro item?
+
+  Como podemos perceber, o teste de razão de verossimilhança apontou para uma estatística teste menor que o valor crítico de uma distribuição qui quadrada ao nível de significância de 5% com 2 graus de liberdade, ou seja, não podemos rejeitar a hipótese nula de que os coeficientes são iguais aos utilizados para gerar a amostra.
+
+```{r}
+vcov <- solve(Theta$hessian)
+vcov
+
+mu_est <-Theta$par[1]
+sigma_est <- Theta$par[2]
+llk_min <- Theta$value
+
+
+#Likelihood ratio test
+LR <- -2*(llk_min - loglike(c(1,4), LN_samp1))
+LR
+
+vcrit <- qchisq(1 - 0.05, 2)  
+vcrit
+```
+
+6) Agora crie 100 amostras que nem a do primeiro item e faça um histograma das estimativas de média e desvio-padrão. Parece uma distribuição normal? 
+
+  Sim, parece uma distribuição normal.
+
+```{r message=FALSE, warning=FALSE}
+    sampi <- replicate(100, rnorm(50, 1, 4)) %>% as_tibble()
+
+    
+    f <- function(i){       
+      b <- sampi %>%
+      pivot_longer(cols = V1:V100) %>%
+      group_by(name) %>%
+      group_nest() %>% 
+      slice(i) %>%
+      unnest() %>%
+      dplyr::select(value) %>%
+      as_vector() 
+    
+     R <- optim(start, loglike, df = b, method = "BFGS")
+    
+      matrix(R$par, ncol=2)
+    }
+     
+     R <- map(1:100, f) 
+     
+     datah1 <- 
+       do.call(rbind, R) %>%
+       as_tibble() %>%
+       print(n=100)
+     
+    hist(datah1$V1, main = "Mean Estimative", xlab = "mean_est")
+    hist(datah1$V2, main = "Standad Deviation Estimative",
+         xlab = "sd_est")
+```
+
+7) Agora crie 1000 amostras e faça histogramas das estimativas de média e desvio-padrão. Parece uma distribuição normal? Teste formalmente (descubra qual é o teste formal pra isso).
+
+  Sim, parece uma distribuição normal.
+
+```{r message=FALSE, warning=FALSE}
+    sampii <- replicate(1000,rnorm(50, 1, 4)) %>% as_tibble()
+    
+    f1 <- function(i){       
+      b <- sampii %>%
+        pivot_longer(cols = V1:V1000) %>%
+        group_by(name) %>%
+        group_nest() %>% 
+        slice(i) %>%
+        unnest() %>%
+        dplyr::select(value) %>%
+        as_vector() 
+      
+      R1 <- optim(start, loglike, df = b, method = "BFGS")
+      
+      matrix(R1$par, ncol=2)
+    }
+    
+    R1 <- map(1:1000, f1) 
+    datah2 <- 
+      do.call(rbind, R1) %>% 
+      as_tibble()
+    
+    hist(datah2$V1, main = "Mean Estimative", xlab = "mean_est")
+    hist(datah2$V2, main = "Standad Deviation Estimative",
+         xlab = "sd_est")
+    
+    ks.test(datah2, "pnorm", mean(datah2$V1), sd(datah2$V2))
+    shapiro.test(datah2$V1)
+    shapiro.test(datah2$V2)
+
+```
+
+8) Agora crie uma amostra aleatória de 10.000 observações, assuminda a mesma média e desvio-padrão do primeiro item. Estime os parâmetros da média e desvio padrão, bem como os erros-padrão da média e do desvio-padrão estimados para as 50 primeiras observações, depois com as 51 primeiras observações da amostra, e assim por diante até chegar na amostra toda. Guarde os valores em um vetor e faça um gráfico. Descreva o que está acontecendo.
+
+  As estimativas dos parâmetros da média e do desvio-padrão para as primeiras sub amostras começam variando bastante em torno de valores mais baixos do que a média e desvio padrão assumidos no primeiro exercício. Conforme estimamos para sub amostras maiores esses valores vão se aproximando do que foi assumido, até se estabilizar nos mesmos para a amostra completa de 10.000 obeservações (média 1 e desvio padrão 4). Com relação aos erros-padrão das médias e desvios-padrão estimados, podemos perceber claramente uma tendência ao zero conforme aumentamos o tamanho da amostra.
+
+```{r message=FALSE, warning=FALSE}
+  LN_samp2 <- 
+      rnorm(10000, 1, 4) %>% 
+      as_tibble()
+    
+    g <- function(x){
+      
+      LN_samp2 %>%
+        slice(1:x)
+      }
+  
+    samples_of_obs <- map(50:10000, g) 
+
+    h <- function(x){
+          a <- optim(start, loglike,
+                 df = x%>%as_vector(),
+                 method = "BFGS")
+      
+          b <- a$par[1]/sqrt(count(x))
+      
+          c <- a$par[2]/sqrt(2*(count(x)-1))
+      
+          bind_cols(a,b,c)
+    }
+    
+    eest <- map(samples_of_obs, ~h(.x))
+    
+      eests <- 
+       eest %>% 
+       bind_rows() %>% 
+       as_tibble() %>%
+       dplyr::select(!convergence) %>%
+       group_by(value) %>%
+       group_nest() %>%
+       pivot_wider(names_from = value,
+                   values_from = data) %>%
+       dplyr::select(1:9951) %>%
+       unnest() 
+      
+      mean_eest <-
+        eests %>%
+        dplyr::select(starts_with("par")) %>%
+        slice(1) %>%
+        as_vector()
+      
+      sd_eest <-
+        eests %>%
+        dplyr::select(starts_with("par")) %>%
+        slice(2) %>%
+        as_vector()
+      
+      ep_mean_eest <-
+        eests %>%
+        slice(1) %>% 
+        dplyr::select(starts_with("n...5")) %>%
+        as_vector()
+      
+      ep_sd_eest <-
+        eests %>%
+        slice(2) %>%
+        dplyr::select(starts_with("n...6")) %>%
+        as_vector()
+      
+      plot(mean_eest, type = "line")
+      plot(sd_eest, type = "line")
+      plot(ep_mean_eest, type = "line")
+      plot(ep_sd_eest, type = "line")
+```
+
+9) Derive a matriz variância-covariância do limite inferior de Cramér-Rao e a avalie nos valores assumidos para gerar os valores aleatórios.
+
+```{r message=FALSE, warning=FALSE}
+sd=4
+mu = 1
+n=10000
+delmu2 <- -1/(sd^2) * n
+deldp2 <-  n/(sd^2) - 3/(sd^4) * sum((LN_samp2 - mu)^2)
+
+I <- -(matrix(c(delmu2, 0, 0, deldp2), nrow = 2, ncol = 2))
+
+vcov_cramer_rao <- solve(I)
+
+vcov_cramer_rao
+```
+
+10) Os valores estimados com amostras cada vez maiores convergem para o limite inferior de Cramér-Rao?
+
+  Estimando a matriz varcovar da amostra com todas as observações, podemos perceber que a diagonal principal da matriz de fato converge para os valores do limite inferior de Cramér-Rao. Além disso, vale lembrar que o estimador de máxima verossimilhança é eficiente para os estimadores e pode atingir o limite inferior.
+
+```{r message=FALSE, warning=FALSE}
+   m <- optim(start, loglike,
+            df = LN_samp2%>%as_vector(),hessian = T,
+            method = "BFGS")
+   vcov2 <- m$hessian %>% solve() 
+   vcov2
+```
+
