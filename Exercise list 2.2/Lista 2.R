@@ -103,6 +103,11 @@
   
   solve(Theta$hessian)
   
+  se<- sqrt(diag(vcov))
+  t<-Theta$par/se
+  pval<-2*(1-pnorm(abs(t[[2]])))
+  results<-cbind(Theta$par,se,t,pval)
+  
   # 6)
     sampi <- replicate(100, rnorm(50, 1, 4)) %>% as_tibble()
 
