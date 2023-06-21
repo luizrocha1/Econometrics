@@ -1,0 +1,265 @@
+---
+title: "Lista 3 ex5"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: "2023-06-21"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+ # Install and load packages ----
+ 
+ if (!require(install.load)) install.packages(install.load)
+install.load::install_load("tidyverse", "gmm") 
+```
+
+a) Estime a média µ e a variância σ^2 com cada uma das 1000 amostras criadas utilizando o estimador de GMM eciente. Dica: se você precisar de alguma condição de momento que não conheça, recorra à função geradora de momentos da distribuição normal.
+
+```{r}
+  # Setando seed e criando as amostras
+    set.seed(14664824)
+  
+    samp15 <- 
+      replicate(1000, rnorm(15,10,2)) %>% 
+      as_tibble() %>%
+      pivot_longer(cols = V1:V1000)
+      
+  # Setando função para as condições de momento
+    
+    g0 <- function(tet, x) {
+      m1 <- (tet[1] - x)
+      m2 <- (tet[2]^2 - (x - tet[1])^2)
+      f <- cbind(m1, m2)
+      return(f)
+    }
+    
+  # Estimando os modelos gmm para cada amostra
+     
+    est15 <-
+      samp15 %>% 
+      group_by(name) %>%
+      group_nest() %>%
+      mutate(
+        model = map(
+          data, ~ gmm(g0, .x, c(mu = 0, sig = 0))
+        ) 
+      )
+    
+    f <- function(x){
+      
+    a <- 
+        est15 %>%
+        slice(x) %>%
+        select(model) %>%
+        unlist()
+    cbind(a$model.coefficients.mu, a$model.coefficients.sig,
+          a$model.objective)
+    }
+    
+    b  <- map(1:1000, f) 
+  
+    gmm_est15  <-
+      do.call(rbind,b) %>%
+      as_tibble() %>%
+      rename(mu = V1, sigma = V2, objective = V3)
+    gmm_est15
+```
+
+b) Faça um histograma com as 1000 estimativas obtidas para µ e σ^2 no item anterior.
+
+```{r}
+   # Histogramas
+    
+     hist(gmm_est15$mu)
+     hist(gmm_est15$sigma)
+```
+
+c) Agora, repita os itens a. e b. utilizando n = 30, 50, 100, 200. Qual é a conclusão?
+
+  i) Para n = 30:
+```{r}
+    samp30 <- 
+      replicate(1000, rnorm(30,10,2)) %>% 
+      as_tibble() %>%
+      pivot_longer(cols = V1:V1000)
+      
+    g0 <- function(tet, x) {
+      m1 <- (tet[1] - x)
+      m2 <- (tet[2]^2 - (x - tet[1])^2)
+      f <- cbind(m1, m2)
+      return(f)
+    }
+    
+    est30 <-
+      samp30 %>% 
+      group_by(name) %>%
+      group_nest() %>%
+      mutate(
+        model = map(
+          data, ~ gmm(g0, .x, c(mu = 0, sig = 0))
+        ) 
+      )
+    
+    f <- function(x){
+      
+    a <- 
+        est30 %>%
+        slice(x) %>%
+        select(model) %>%
+        unlist()
+    cbind(a$model.coefficients.mu, a$model.coefficients.sig,
+          a$model.objective)
+    }
+    
+    b  <- map(1:1000, f) 
+  
+    gmm_est30  <-
+      do.call(rbind,b) %>%
+      as_tibble() %>%
+      rename(mu = V1, sigma = V2, objective = V3)
+    gmm_est30
+    
+    hist(gmm_est30$mu)
+    hist(gmm_est30$sigma)
+```
+  
+  i) Para n = 50:
+```{r}
+    samp50 <- 
+      replicate(1000, rnorm(50,10,2)) %>% 
+      as_tibble() %>%
+      pivot_longer(cols = V1:V1000)
+      
+    g0 <- function(tet, x) {
+      m1 <- (tet[1] - x)
+      m2 <- (tet[2]^2 - (x - tet[1])^2)
+      f <- cbind(m1, m2)
+      return(f)
+    }
+    
+    est50 <-
+      samp50 %>% 
+      group_by(name) %>%
+      group_nest() %>%
+      mutate(
+        model = map(
+          data, ~ gmm(g0, .x, c(mu = 0, sig = 0))
+        ) 
+      )
+    
+    f <- function(x){
+      
+    a <- 
+        est50 %>%
+        slice(x) %>%
+        select(model) %>%
+        unlist()
+    cbind(a$model.coefficients.mu, a$model.coefficients.sig,
+          a$model.objective)
+    }
+    
+    b  <- map(1:1000, f) 
+  
+    gmm_est50  <-
+      do.call(rbind,b) %>%
+      as_tibble() %>%
+      rename(mu = V1, sigma = V2, objective = V3)
+    gmm_est50
+    
+    hist(gmm_est50$mu)
+    hist(gmm_est50$sigma)
+```
+
+  i) Para n = 100:
+```{r}
+    samp100 <- 
+      replicate(1000, rnorm(100,10,2)) %>% 
+      as_tibble() %>%
+      pivot_longer(cols = V1:V1000)
+      
+    g0 <- function(tet, x) {
+      m1 <- (tet[1] - x)
+      m2 <- (tet[2]^2 - (x - tet[1])^2)
+      f <- cbind(m1, m2)
+      return(f)
+    }
+    
+    est100 <-
+      samp100 %>% 
+      group_by(name) %>%
+      group_nest() %>%
+      mutate(
+        model = map(
+          data, ~ gmm(g0, .x, c(mu = 0, sig = 0))
+        ) 
+      )
+    
+    f <- function(x){
+      
+    a <- 
+        est100 %>%
+        slice(x) %>%
+        select(model) %>%
+        unlist()
+    cbind(a$model.coefficients.mu, a$model.coefficients.sig,
+          a$model.objective)
+    }
+    
+    b  <- map(1:1000, f) 
+  
+    gmm_est100  <-
+      do.call(rbind,b) %>%
+      as_tibble() %>%
+      rename(mu = V1, sigma = V2, objective = V3)
+    gmm_est100
+    
+    hist(gmm_est100$mu)
+    hist(gmm_est100$sigma)
+```
+
+  i) Para n = 200:
+```{r}
+    samp200 <- 
+      replicate(1000, rnorm(200,10,2)) %>% 
+      as_tibble() %>%
+      pivot_longer(cols = V1:V1000)
+      
+    g0 <- function(tet, x) {
+      m1 <- (tet[1] - x)
+      m2 <- (tet[2]^2 - (x - tet[1])^2)
+      f <- cbind(m1, m2)
+      return(f)
+    }
+    
+    est200 <-
+      samp200 %>% 
+      group_by(name) %>%
+      group_nest() %>%
+      mutate(
+        model = map(
+          data, ~ gmm(g0, .x, c(mu = 0, sig = 0))
+        ) 
+      )
+    
+    f <- function(x){
+      
+    a <- 
+        est200 %>%
+        slice(x) %>%
+        select(model) %>%
+        unlist()
+    cbind(a$model.coefficients.mu, a$model.coefficients.sig,
+          a$model.objective)
+    }
+    
+    b  <- map(1:1000, f) 
+  
+    gmm_est200  <-
+      do.call(rbind,b) %>%
+      as_tibble() %>%
+      rename(mu = V1, sigma = V2, objective = V3)
+    gmm_est200
+    
+    hist(gmm_est200$mu)
+    hist(gmm_est200$sigma)
+```
+
