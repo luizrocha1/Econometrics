@@ -19,7 +19,7 @@ a) Estime a média µ e a variância σ^2 com cada uma das 1000 amostras criadas
     set.seed(14664824)
   
     samp15 <- 
-      replicate(1000, rnorm(15,10,2)) %>% 
+      replicate(1000, rnorm(15,10,sqrt(2))) %>% 
       as_tibble() %>%
       pivot_longer(cols = V1:V1000)
       
@@ -74,11 +74,13 @@ b) Faça um histograma com as 1000 estimativas obtidas para µ e σ^2 no item an
 ```
 
 c) Agora, repita os itens a. e b. utilizando n = 30, 50, 100, 200. Qual é a conclusão?
+  
+  A conclusão é de que as estimativas se aproximam de uma normal de média 10 e variância 2.
 
   i) Para n = 30:
 ```{r}
     samp30 <- 
-      replicate(1000, rnorm(30,10,2)) %>% 
+      replicate(1000, rnorm(30,10,sqrt(2))) %>% 
       as_tibble() %>%
       pivot_longer(cols = V1:V1000)
       
@@ -125,7 +127,7 @@ c) Agora, repita os itens a. e b. utilizando n = 30, 50, 100, 200. Qual é a con
   i) Para n = 50:
 ```{r}
     samp50 <- 
-      replicate(1000, rnorm(50,10,2)) %>% 
+      replicate(1000, rnorm(50,10,sqrt(2))) %>% 
       as_tibble() %>%
       pivot_longer(cols = V1:V1000)
       
@@ -172,7 +174,7 @@ c) Agora, repita os itens a. e b. utilizando n = 30, 50, 100, 200. Qual é a con
   i) Para n = 100:
 ```{r}
     samp100 <- 
-      replicate(1000, rnorm(100,10,2)) %>% 
+      replicate(1000, rnorm(100,10,sqrt(2))) %>% 
       as_tibble() %>%
       pivot_longer(cols = V1:V1000)
       
@@ -219,7 +221,7 @@ c) Agora, repita os itens a. e b. utilizando n = 30, 50, 100, 200. Qual é a con
   i) Para n = 200:
 ```{r}
     samp200 <- 
-      replicate(1000, rnorm(200,10,2)) %>% 
+      replicate(1000, rnorm(200,10,sqrt(2))) %>% 
       as_tibble() %>%
       pivot_longer(cols = V1:V1000)
       
