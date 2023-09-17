@@ -1,0 +1,149 @@
+---
+title: "Lista 3 q5"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: "2023-09-17"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+ if (!require(install.load)) install.packages(install.load)
+ install.load::install_load("tidyverse", "tseries", "forecast",
+                            "dynlm", "stargazer", "zoo", "rbcb",
+                            "ipeadatar", "gridExtra") 
+```
+
+5)
+
+a) 
+
+O artigo de Hall (1978), discute as implicações da Teoria da Renda Permanente sobre a evolução do consumo no tempo. Segundo o autor, boa parte da literatura empírica produzida até então não havia levado em conta a endogeneidade da renda em uma função de consumo, o que iria distorcer a função estimada. 
+
+Essa endogeneidade, contudo, não seria um obstáculo à avaliação da hipótese levantada pela TRP, isto é, de que o consumo corrente e futuro depende fundamentalmente da renda permanente esperada pelo consumidor. Essa hipótese seria equivalente à hipótese de que o consumo não pode ser explicado por nenhuma outra variável a não ser o próprio consumo do período anterior. Informações adicionais seriam irrelevantes ou já estariam contidas na informação do
+consumo prévio, ou seja, o consumo seria um passeio aleatório com uma tendência. 
+
+É importante notar que, apesar de Hall considerar o consumo como um passeio aleatório com tendência, isto é, uma série não estacionária, ele não se preocupa em ajustar os dados de modo a estacionarizar a série, o que invalida os resultados encontrados. Seria importante a realização de um teste de raiz unitária e, caso confirmada a não estacionariedade, realizar a devida diferenciação.
+
+Além disso, após as importantes contribuições de Beveridge e Nelson, poderíamos reinterpretar a discussão levantada por Hall a partir da separação do componente cíclico e da tendência estocástica (Gomes, 2004). A TRP seria, então, refutada, caso o consumo possuísse um componente cíclico. É dizer, segundo a TRP, o consumo deveria possuir uma raiz unitária e, após seu devido ajuste a um modelo
+ARIMA (p,1,q), o componente cíclico deveria ser nulo: p=q=0.
+
+b) Importando dados e tratando:
+
+```{r}
+ # Getting series
+
+  PIB <- get_series("22099") %>%
+      slice(5:114)
+    
+    C <- ipeadata(code="SCN104_CFPPBM104") %>%
+      select(date, value)
+    
+    Titulos <- ipeadata(code="ANBIMA12_IBVSP12") %>%
+      select(date, value) %>%
+      filter(date >= as_date("1996-01-01")) %>%
+      mutate(
+        qdate = as.yearqtr(date)) %>%
+      group_by(qdate) %>%
+      summarize(mean(value)) %>%
+      mutate(date = as_date(qdate)) %>%
+      select(-qdate)
+    
+    df <-
+      left_join(PIB, C) %>%
+      left_join(., Titulos) %>%
+      rename(pib = `22099`, consumo = `value`, titulos = `mean(value)`)
+    
+    
+    grid.arrange(ggplot(data = df, aes(x = date, y = pib))+
+                   geom_line(color = "black"),
+                 ggplot(data = df, aes(x = date, y = consumo))+
+                   geom_line(color = "black"),
+                 ggplot(data = df, aes(x = date, y = titulos))+
+                   geom_line(color = "black")
+    )
+    
+  # Converting to ts format
+    
+    pib <- ts(df$pib, start = c(1996,1), frequency = 4)
+    
+    c <- ts(df$consumo, start = c(1996,1), frequency = 4)
+    
+    t <- ts(df$titulos, start = c(1996,1), frequency = 4)
+
+  # Treating seasonality
+    
+    pib_ <- seasadj(stl(pib, "periodic"))
+    c_ <- seasadj(stl(c, "periodic"))
+
+    grid.arrange(
+    ggplot(data = df)+
+        geom_line(aes(x = date, y = pib),color = "black") +
+        geom_line(aes(x = date, y = pib_),color = "red"),
+    ggplot(data = df)+
+      geom_line(aes(x = date, y = c),color = "black") +
+      geom_line(aes(x = date, y = c_),color = "red")
+      )
+```
+
+Testando estacionariedade: 
+
+```{r}
+ # Stationarity test
+   adf.test(pib_)
+
+   adf.test(c_)
+
+   pib_E <- diff(pib_)
+   
+   c_E <- diff(c_)
+   
+   t_E <- diff(t)
+   
+   adf.test(pib_E)
+   
+   adf.test(c_E)
+     
+   grid.arrange(autoplot(pib_E), 
+                autoplot(c_E),
+                autoplot(t_E))
+```
+
+Seguindo para estimação:
+
+i) Modelo com uma defasagem de consumo 
+
+```{r}
+  model_i <- dynlm(c_E ~ L(c_E,1))
+  stargazer(model_i, type = "text")
+```
+
+ii) Modelo com 4 defasagens de consumo:
+
+```{r}
+  model_ii <- dynlm(c_E ~ L(c_E, 1:4))
+  stargazer(model_ii, type = "text")
+```
+
+iii) Modelo com defasagem de renda:
+
+```{r}
+  model_iii <- dynlm(c_E ~ L(c_E, 1) + L(pib_E, 1))
+  stargazer(model_iii, type = "text")
+```
+
+iv) Modelo com 2 defasagens de renda: 
+
+```{r}
+  model_iv <- dynlm(c_E ~ L(c_E, 1) + L(pib_E, 1:2))
+  stargazer(model_iv, type = "text")
+```
+
+v) Modelo com 4 defasagens de títulos: 
+
+```{r}
+  model_v <- dynlm(c_E ~ L(c_E, 1) + L(t_E, 1:4))
+  stargazer(model_v, type = "text")
+```
+
+c) Diferentemente de Hall (1978), nenhum modelo estimado apresentou o primeiro lag do consumo como significante para explicar o consumo corrente. Na estimação ii) podemos ver que o consumo com 3 defasagens foi significante para explicar o consumo corrente, indo de encontro à hipótese da renda permanente. Os modelos iii) e iv) que utilizam a renda e a renda com 2 defasagens para explicar o consumo não se mostraram significantes. Por fim, o modelo v) mostra significância das defasagens 1 e 2 dos títulos da bolsa para explicar o consumo corrente, conforme Hall (1978).
+
+
