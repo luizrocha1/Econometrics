@@ -22,7 +22,7 @@ Carregando dados:
 ```{r}
  # Getting df
 
-    df <- read.csv2("lista3_q9.csv")
+    df <- read.csv2("base.csv")
 
 ```
 
@@ -30,19 +30,19 @@ Setando condições de momento:
 
 ```{r}
     
-    g1 <- function(par, dados){
-      m0 = par[1] * (dados[,7]^(par[2]-1)) * (1+dados[,2]) - 1
-      m11 = m0 * dados[,8]
-      m12 = m0 * dados[,3]
+    g1 <- function(par, x){
+      m0 = par[1] * (x[,7]^(par[2]-1)) * (1+x[,2]) - 1
+      m11 = m0 * x[,8]
+      m12 = m0 * x[,3]
       return(cbind(m0,m11,m12))
-    }
+      }
     
-    g2 <- function(par, dados){
-      m0 = par[1] * (dados[,7]^(par[2]-1)) * (1+dados[,2]) - 1
-      m11 = m0 * dados[,8]
-      m12 = m0 * dados[,3]
-      m21 = m0 * dados[,9]
-      m22 = m0 * dados[,4]
+    g2 <- function(par, x){
+      m0 = par[1] * (x[,7]^(par[2]-1)) * (1+x[,2]) - 1
+      m11 = m0 * x[,8]
+      m12 = m0 * x[,3]
+      m21 = m0 * x[,9]
+      m22 = m0 * x[,4]
       return(cbind(m0,m11,m12,m21,m22))
     }
     
@@ -88,7 +88,7 @@ Estimando por gmm:
 ```
  Pelos resultados das estimações, os coeficientes delta apresentam valores similares com os do artigo. Por outro lado, os coeficientes gamma não são tão próximos.
 
-b) Conforme variam os instrumentos, no geral, as estimativas não mudam significativamente, porém, o gamma na sexta defasagem muda bastante.
+b) Conforme variam os instrumentos, no geral, as estimativas não mudam significativamente.
 
 c)
 

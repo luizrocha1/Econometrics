@@ -37,7 +37,7 @@
  
  # Getting df
  
-    df <- read.csv2("Exercise list 3.3/lista3_q9.csv")
+    df <- read.csv2("Exercise list 3.3/base.csv")
   
  # Setting moment conditions for estimation
     
