@@ -1,0 +1,97 @@
+---
+title: "ex 9"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: "2023-09-26"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+ if (!require(install.load)) install.packages(install.load)
+ install.load::install_load("tidyverse", "tidyverse", "tseries", "forecast",
+                            "dynlm", "stargazer", "zoo", "rbcb",
+                            "ipeadatar", "gridExtra", "readxl") 
+```
+
+9)
+
+Criando função que simula o processo:
+
+```{r}
+sim_y <- function(phi, m){
+eps <- rnorm(m+1)
+y <- rep(0, m+1)
+for (t in 2:(m+1)){
+y[t] = phi*y[t-1] + eps[t]
+}
+return(y)
+}
+```
+
+
+
+```{r}
+m <- 100 
+N <- 1000
+```
+
+  i) Para phi = 1:
+  
+```{r}
+phi_vec <- rep(0,N)
+
+for (i in 1:N){
+y <- sim_y(1, m)
+y_left <- y[-1]
+y_right <- y[-(m+1)]
+o <- lm(y_left ~ y_right)
+phi_vec[i] <- coefficients(o)[2]
+}
+
+hist(phi_vec, breaks = 20)
+
+t.test(x = phi_vec, mu = 1)
+```
+  
+  Pelo histograma, vemos que phi tem uma distribuição assimétrica à esquerda e pelo teste T, checamos que a média é, aproximadamente, 0.94 sendo a hipótese nula rejeitada devido ao
+p-valor pequeno. Logo, o estimador possui autocorrelação nos erros.
+  
+  
+  ii) Para phi = 0.9:
+  
+```{r}
+phi_vec <- rep(0,N)
+
+for (i in 1:N){
+y <- sim_y(0.9, m)
+y_left <- y[-1]
+y_right <- y[-(m+1)]
+o <- lm(y_left ~ y_right)
+phi_vec[i] <- coefficients(o)[2]
+}
+
+hist(phi_vec, breaks = 20)
+
+t.test(x = phi_vec, mu = 0.9)
+```
+
+  Da mesma forma que em i), o histograma mostra uma distribuição assimétrica à esquerda, com média é 0.85, e pelo teste T rejeitamos H0. Portanto, há indicação de que o estimador também não é consistente neste caso.
+  
+  iii) Para phi = 0.5:
+  
+```{r}
+phi_vec <- rep(0,N)
+
+for (i in 1:N){
+y <- sim_y(0.5, m)
+y_left <- y[-1]
+y_right <- y[-(m+1)]
+o <- lm(y_left ~ y_right)
+phi_vec[i] <- coefficients(o)[2]
+}
+
+hist(phi_vec, breaks = 20)
+
+t.test(x = phi_vec, mu = 0.5)
+```
+
+  No último caso, apesar de termos uma distribuição mais próxima da normal, cuja média é 0.47, pelo teste T rejeitamos a hipótese nula de phi = 0.5. Assim, o estimador de MQO não é consistente com presença de correlação serial e um baixo número de observações, como neste caso em que consideramos apenas 100 observações em cada série simulada.

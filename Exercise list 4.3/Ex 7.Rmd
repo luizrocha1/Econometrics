@@ -1,0 +1,144 @@
+---
+title: "ex 7"
+author: "Luiz Eduardo Medeiros da Rocha"
+date: "2023-09-26"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+ if (!require(install.load)) install.packages(install.load)
+ install.load::install_load("tidyverse", "tidyverse", "tseries", "forecast",
+                            "dynlm", "stargazer", "zoo", "rbcb",
+                            "ipeadatar", "gridExtra", "readxl") 
+```
+
+7)
+
+a)
+
+Lendo dados e declarando no formato ts:
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+ df <- read_excel("dados_lista_04.xls") %>%
+   select(y)
+
+ ts(df)
+```
+
+Análise de correlograma: 
+
+```{r}
+ acf(df)
+ 
+ pacf(df)
+```
+  Os gráficos sugerem um ARMA. Vamos criar função para encontrar o modelo que melhor se adequa.
+
+```{r warning=FALSE}
+ arma <- matrix(0,5,5)
+ 
+ ar <- matrix(0,5,1)
+ 
+ ma <- matrix(0,5,1)
+ 
+ for (i in 1:5){
+   for(j in 1:5){
+     arma[i,j] <- AIC(arima(df, order = c(i,0,j)), k =i+j+1)
+     ma[j,] <- AIC(arima(df, order = c(0,0,j)), k =j+1)
+   }
+   ar[i,] <- AIC(arima(df, order = c(i,0,0)), k =i+1)
+ }
+ cbind(min(arma), min(ma), min(ar)) 
+ which(arma == min(arma), arr.ind = TRUE)
+```
+Modelo é um ARMA(1,2).
+
+b)
+
+Vamos criar a função de máxima verossimilhança:
+
+```{r}
+ df_2 <- df %>% as.matrix()
+ 
+ mv_1 <- function(b){
+   c <- b[1]
+   phi_1 <- b[2]
+   phi_2 <- b[3]
+   theta <- b[4]
+   sigma <- b[5]
+   u <- vector()
+   u[1] = 0
+   u[2] = 0
+   for (t in (3:300)){
+     u[t] = df_2[t,]-c-phi_1*df_2[t-1,]-phi_2*df_2[t-2,]-theta*u[t-1]
+   }
+   
+   log_v = (((300-2)/2)*log(2*pi*sigma^2) + (1/(2*sigma^2))*sum(u*u))
+   return(log_v)
+ }
+```
+
+Estimação: 
+
+```{r}
+ resultado_b <- optim(c(0, 0, 0, 0, 1), mv_1, hessian = TRUE)
+ resultado_b$par
+```
+
+c)
+
+```{r}
+ df_3 <- rbind(mean(df_2), mean(df_2), df_2)
+```
+
+Vamos criar a função de máxima verossimilhança:
+
+```{r}
+ mv_2 <- function(b){
+   c <- b[1]
+   phi_1 <- b[2]
+   phi_2 <- b[3]
+   theta <- b[4]
+   sigma <- b[5]
+   u <- vector()
+   u[1] = 0
+   u[2] = 0
+   for (t in (3:302)){
+     u[t] = df_3[t,]-c-phi_1*df_3[t-1,]-phi_2*df_3[t-2,]-theta*u[t-1]
+   }
+   
+   log_v = (((302-2)/2)*log(2*pi*sigma^2) + (1/(2*sigma^2))*sum(u*u))
+   return(log_v)
+ }
+```
+
+Estimação: 
+
+```{r}
+ resultado_c <- optim(c(0, 0, 0, 0, 1),mv_2, hessian = TRUE)
+ resultado_c$par
+```
+
+d) 
+
+Calculando os desvio-padrão:
+
+```{r}
+ dp_1 <- resultado_b$hessian %>% solve() %>% diag() %>% sqrt()
+ 
+ dp_2 <- resultado_c$hessian %>% solve() %>% diag() %>% sqrt()
+ 
+ dp_1
+ dp_2
+```
+Calculando a matriz de informação que, no caso da máxima verossimilhança (quando vale a IIF), é identica à matriz de covariância:
+
+```{r}
+hessiana_1 <- resultado_b$hessian
+
+hessiana_2 <- resultado_c$hessian
+
+hessiana_1
+hessiana_2
+```
+
